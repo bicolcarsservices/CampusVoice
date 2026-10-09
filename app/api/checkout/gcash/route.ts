@@ -73,6 +73,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Online payments are not configured yet." }, { status: 503 });
   }
 
+  const admin = createAdminClient();
+  const { data: pendingSubscription, error: pendingError } = await admin
+    .from("subscriptions")
+    .select("payment_method")
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .maybeSingle();
+  if (pendingError) {
+    console.error("Could not check for a pending subscription before GCash checkout", pendingError);
+    return NextResponse.json({ error: "Could not verify your subscription request." }, { status: 500 });
+  }
+  if (pendingSubscription) {
+    const message = pendingSubscription.payment_method === "gcash"
+      ? "You already have a pending GCash checkout. Complete it or contact an administrator before starting another."
+      : "You already have a pending subscription request. Wait for admin review or contact an administrator before starting GCash checkout.";
+    return NextResponse.json({ error: message }, { status: 409 });
+  }
+
   try {
     const returnUrl = new URL("/subscription", siteUrl);
     const intent = await paymongo("/payment_intents", {
@@ -94,7 +112,6 @@ export async function POST(request: Request) {
       throw new Error("PayMongo returned no secure GCash redirect URL.");
     }
 
-    const admin = createAdminClient();
     const { data: subscription, error: subscriptionError } = await admin
       .from("subscriptions")
       .insert({
@@ -123,6 +140,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ redirectUrl });
   } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+      return NextResponse.json({
+        error: "A pending subscription request already exists. Wait for admin review or contact an administrator before trying GCash again.",
+      }, { status: 409 });
+    }
     console.error("GCash checkout failed", error);
     return NextResponse.json({ error: "Could not start the GCash payment. Please try again." }, { status: 502 });
   }
