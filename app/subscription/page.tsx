@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PlanRequestForm from "@/components/community/PlanRequestForm";
+import GcashCheckout from "@/components/community/GcashCheckout";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export default async function SubscriptionPage() {
       <header className="mx-auto max-w-2xl text-center">
         <p className="eyebrow">Plans that grow with your voice</p>
         <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Subscriptions are requested for manual admin review. No payment is charged or confirmed on this page.</p>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan and pay securely with GCash, or submit a manual payment request for admin review.</p>
         {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
       <div className="grid items-stretch gap-5 md:grid-cols-3">
@@ -49,7 +50,13 @@ export default async function SubscriptionPage() {
               {plan.code === "free" ? (
                 <Link href={user ? "/wall" : "/register"} className="btn-ghost w-full">{user ? "Continue with Free" : "Get started"}</Link>
               ) : user ? (
-                <PlanRequestForm planId={plan.id} />
+                <>
+                  <GcashCheckout planId={plan.id} planName={plan.name} />
+                  <details className="mt-3 text-sm">
+                    <summary className="cursor-pointer text-slate-600 dark:text-slate-300">Use a manual payment request instead</summary>
+                    <PlanRequestForm planId={plan.id} />
+                  </details>
+                </>
               ) : (
                 <Link href="/login" className="btn-primary w-full">Log in to request</Link>
               )}
@@ -57,7 +64,7 @@ export default async function SubscriptionPage() {
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-500">All paid plan requests must be verified by an administrator. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>
+      <p className="text-center text-xs text-slate-500">GCash subscriptions activate after PayMongo confirms payment. Manual requests require administrator review. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>
     </div>
   );
 }
