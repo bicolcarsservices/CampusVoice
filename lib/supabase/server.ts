@@ -42,13 +42,9 @@ export function isMissingAuthSession(error: unknown) {
   return name === "AuthSessionMissingError" || message.includes("auth session missing");
 }
 
-type AuthClient = {
-  auth: {
-    getUser: () => Promise<{ data: { user: User | null }; error: { message: string } | null }>;
-  };
-};
+type ServerClient = ReturnType<typeof createClient>;
 
-export async function getAuthUser(supabase?: AuthClient) {
+export async function getAuthUser(supabase?: ServerClient) {
   const client = supabase ?? createClient();
   try {
     const { data, error } = await client.auth.getUser();
