@@ -1,7 +1,7 @@
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
 import RegisterForm from "@/components/RegisterForm";
 
-export default async function RegisterPage() {
+export default async function RegisterPage({ searchParams }: { searchParams?: { next?: string } }) {
   if (!hasSupabaseConfig()) {
     return (
       <div className="card mx-auto max-w-lg">
@@ -14,10 +14,11 @@ export default async function RegisterPage() {
   }
 
   const { data } = await createClient().from("schools").select("id,name").order("name");
+  const next = searchParams?.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : undefined;
   return (
     <div className="card mx-auto max-w-sm">
       <h1 className="mb-4 text-2xl font-bold">Create Account</h1>
-      <RegisterForm schools={data ?? []} />
+      <RegisterForm schools={data ?? []} next={next} />
     </div>
   );
 }

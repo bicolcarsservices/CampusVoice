@@ -18,7 +18,7 @@ function ResetSubmit() {
   return <button type="submit" className="btn-ghost w-full" disabled={pending}>{pending ? "Sending..." : "Send password reset link"}</button>;
 }
 
-export default function LoginPage({ searchParams }: { searchParams?: { error?: string; registered?: string } }) {
+export default function LoginPage({ searchParams }: { searchParams?: { error?: string; registered?: string; next?: string } }) {
   const [state, action] = useFormState(login, null);
   const [resendState, resendAction] = useFormState(resendConfirmation, null);
   const [resetState, resetAction] = useFormState(requestPasswordReset, null);
@@ -46,6 +46,7 @@ export default function LoginPage({ searchParams }: { searchParams?: { error?: s
         </p>
       )}
       <form action={action} className="space-y-3">
+        {searchParams?.next && <input type="hidden" name="next" value={searchParams.next} />}
         <label className="block text-sm">Email
           <input name="email" type="email" required autoComplete="email" className="input mt-1" />
         </label>
@@ -66,7 +67,7 @@ export default function LoginPage({ searchParams }: { searchParams?: { error?: s
           <ResetSubmit />
         </form>
       </details>
-      <p className="mt-4 text-sm">No account? <Link href="/register" className="font-semibold text-brand">Create Account</Link></p>
+      <p className="mt-4 text-sm">No account? <Link href={searchParams?.next ? `/register?next=${encodeURIComponent(searchParams.next)}` : "/register"} className="font-semibold text-brand">Create Account</Link></p>
     </div>
   );
 }

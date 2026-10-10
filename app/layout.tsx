@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 export const metadata: Metadata = {
   title: "CampusVoice",
   description: "Your Voice. Your Space. Your Story.",
+  icons: { icon: "/campusvoice-logo.jpg" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Navbar />
-        <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         <Footer />
       </body>
     </html>

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
 import { resolveSchoolName } from "@/lib/schools";
 
-const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1), next: z.string().optional() });
 const registerSchema = z.object({
   full_name: z.string().trim().min(2).max(60),
   username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/, "3-20 letters, numbers or _"),
@@ -13,7 +13,15 @@ const registerSchema = z.object({
   password: z.string().min(8, "At least 8 characters"),
   school_name: z.string().trim().max(100).optional().default(""),
   grade_level: z.string().trim().min(1).max(30),
+  next: z.string().optional(),
 });
+
+function getSafeNextPath(value?: string) {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
+  const destination = new URL(value, "http://campusvoice.local");
+  if (destination.origin !== "http://campusvoice.local") return null;
+  return `${destination.pathname}${destination.search}${destination.hash}`;
+}
 
 function getAuthCallbackUrl() {
   const origin = headers().get("origin");
@@ -44,7 +52,7 @@ export async function login(_: unknown, fd: FormData) {
   if (adminError) {
     return { error: `You are signed in, but administrator access could not be checked: ${adminError.message}` };
   }
-  redirect(isAdmin ? "/admin" : "/wall");
+  redirect(isAdmin ? "/admin" : getSafeNextPath(parsed.data.next) ?? "/wall");
 }
 
 export async function register(_: unknown, fd: FormData) {
@@ -54,7 +62,7 @@ export async function register(_: unknown, fd: FormData) {
 
   const parsed = registerSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
-  const { email, password, ...meta } = parsed.data;
+  const { email, password, next, ...meta } = parsed.data;
   const supabase = createClient();
   const { data: schools, error: schoolsError } = meta.school_name
     ? await supabase.from("schools").select("id,name").eq("is_active", true)
@@ -76,8 +84,14 @@ export async function register(_: unknown, fd: FormData) {
     },
   });
   if (error) return { error: getEmailAuthError(error.message) };
-  if (!data.session) redirect("/login?registered=1");
-  redirect("/wall");
+  const safeNextPath = getSafeNextPath(next);
+  if (!data.session) {
+    const destination = safeNextPath
+      ? `/login?registered=1&next=${encodeURIComponent(safeNextPath)}`
+      : "/login?registered=1";
+    redirect(destination);
+  }
+  redirect(safeNextPath ?? "/wall");
 }
 
 export async function resendConfirmation(_: unknown, fd: FormData) {

@@ -7,10 +7,11 @@ function Submit() {
   return <button type="submit" className="btn-primary w-full" disabled={pending}>{pending ? "Creating..." : "Create Account"}</button>;
 }
 
-export default function RegisterForm({ schools }: { schools: { id: string; name: string }[] }) {
+export default function RegisterForm({ schools, next }: { schools: { id: string; name: string }[]; next?: string }) {
   const [state, action] = useFormState(register, null);
   return (
     <form action={action} className="space-y-3">
+      {next && <input type="hidden" name="next" value={next} />}
       <label className="block text-sm">Full name<input name="full_name" required className="input mt-1" /></label>
       <label className="block text-sm">Username<input name="username" required className="input mt-1" /></label>
       <label className="block text-sm">Email<input name="email" type="email" required className="input mt-1" /></label>

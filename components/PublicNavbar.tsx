@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/auth-actions";
 
@@ -12,37 +14,22 @@ export default function PublicNavbar({
   isAdmin: boolean;
 }) {
   const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
   if (pathname.startsWith("/admin")) return null;
 
   return (
     <header className="site-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
       <nav aria-label="Main navigation" className="public-navigation mx-auto max-w-7xl px-4 py-3">
         <Link href="/" className="public-brand">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-violet-100 text-sm dark:bg-violet-950">CV</span>
-          <span>CampusVoice</span>
+          <Image
+            src="/campusvoice-logo.jpg"
+            alt="CampusVoice"
+            width={635}
+            height={202}
+            priority
+            className="public-brand-logo"
+          />
         </Link>
-        <div className="public-nav-links">
-          <Link href="/wall" className="public-nav-button">Freedom Wall</Link>
-          <Link href="/schools" className="public-nav-button">Schools</Link>
-          {signedIn && <Link href="/wall/new" className="public-nav-button public-nav-highlight">Create Post</Link>}
-          <details className="games-menu">
-            <summary className="public-nav-button">Games <span aria-hidden="true">⌄</span></summary>
-            <div className="games-menu-panel">
-              <Link href="/games/campus-coin-rush" className="games-menu-item">Campus Coin Rush</Link>
-              <Link href="/games/galactic-striker" className="games-menu-item">Galactic Striker</Link>
-            </div>
-          </details>
-          <Link href="/subscription" className="public-nav-button">Plans</Link>
-          {signedIn && (
-            <>
-              <Link href="/wallet" className="public-nav-button">Wallet</Link>
-              <Link href="/notifications" className="public-nav-button">Notifications</Link>
-              <Link href="/profile" className="public-nav-button">Profile</Link>
-              {isAdmin && <Link href="/admin" className="public-nav-button public-nav-admin">Admin</Link>}
-            </>
-          )}
-          <Link href="/guidelines" className="public-nav-button">Guidelines</Link>
-        </div>
         <div className="public-nav-account">
           {signedIn ? (
             <form action={logout}><button type="submit" className="btn-ghost">Log out</button></form>
@@ -52,6 +39,31 @@ export default function PublicNavbar({
               <Link href="/register" className="btn-primary">Create account</Link>
             </>
           )}
+        </div>
+        <button
+          type="button"
+          className="mobile-menu-toggle"
+          aria-expanded={menuOpen}
+          aria-controls="public-site-links"
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? "Close menu" : "Menu"}
+        </button>
+        <div id="public-site-links" className={`public-nav-links${menuOpen ? " public-nav-links-open" : ""}`}>
+          <Link href="/wall" className="public-nav-button" onClick={() => setMenuOpen(false)}>Freedom Wall</Link>
+          <Link href="/schools" className="public-nav-button" onClick={() => setMenuOpen(false)}>Schools</Link>
+          {signedIn && <Link href="/wall/new" className="public-nav-button public-nav-highlight" onClick={() => setMenuOpen(false)}>Create Post</Link>}
+          <Link href="/games" className="public-nav-button" onClick={() => setMenuOpen(false)}>Games</Link>
+          <Link href="/subscription" className="public-nav-button" onClick={() => setMenuOpen(false)}>Plans</Link>
+          {signedIn && (
+            <>
+              <Link href="/wallet" className="public-nav-button" onClick={() => setMenuOpen(false)}>Wallet</Link>
+              <Link href="/notifications" className="public-nav-button" onClick={() => setMenuOpen(false)}>Notifications</Link>
+              <Link href="/profile" className="public-nav-button" onClick={() => setMenuOpen(false)}>Profile</Link>
+              {isAdmin && <Link href="/admin" className="public-nav-button public-nav-admin" onClick={() => setMenuOpen(false)}>Admin</Link>}
+            </>
+          )}
+          <Link href="/guidelines" className="public-nav-button" onClick={() => setMenuOpen(false)}>Guidelines</Link>
         </div>
       </nav>
     </header>
