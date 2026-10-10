@@ -49,17 +49,37 @@ the user submits a new request.
    the top-up deduction fields and Dias purchase functions.
 2. Run `supabase/game-rewards.sql` after the schema and wallet scripts to add
    private Campus Coin Rush claim records and admin review functions.
-3. Put the Maya QR image at `public/maya-qr.jpg` to show it on `/wallet` and
+3. Run `supabase/galactic-striker.sql` after the schema and wallet scripts to
+   add Galactic Striker's server-stored Dias inventory, conversion requests,
+   separate earnings balance, and manually reviewed GCash/Maya payouts. Do not
+   use the CampusVoice top-up wallet or Dias balance for game earnings.
+4. Galactic Striker is at `/games/galactic-striker` and requires an active Basic
+   or Premium subscription. Basic conversions are 25,000 crystals = ₱25 or
+   60,000 = ₱50; Premium conversions are 25,000 = ₱25 or 60,000 = ₱60.
+   Conversion requests must be approved under **Admin → Galactic Striker**
+   before funds are credited. Payout requests reserve the requested gross
+   earnings, deduct 10% VAT from the payout, and must be approved and manually
+   sent by an admin. Rejecting a payout restores the gross amount.
+   Crystals earned by the current browser-based game are still client-reported
+   and can be manipulated; the pending admin conversion review prevents an
+   automatic payout but is not server-side gameplay verification. A new
+   subscription period clears the local crystal count when the game is next
+   opened (and expires an open game); server-stored Dias and owned Galactic
+   Striker inventory are not cleared. Dias purchases use the CampusVoice
+   wallet packages and are recorded in the shared game Dias balance. A fully
+   cheat-resistant reward balance requires moving gameplay/reward calculation
+   to a trusted server.
+5. Put the Maya QR image at `public/maya-qr.jpg` to show it on `/wallet` and
    subscription plans. Users submit the amount they sent and payment reference;
    an admin verifies the Maya transfer, enters the amount actually received
    and any fee/deduction, and checks the net wallet credit before approving.
    A note is required when a deduction is applied. The net amount is credited,
    not the requested or gross transfer amount.
-4. The game is available to signed-in users at `/games/campus-coin-rush`.
+6. Campus Coin Rush is available to signed-in users at `/games/campus-coin-rush`.
    Dias packages cost ₱49/₱99/₱199/₱399 and credit 50/120/300/700 Dias,
    respectively, from the CampusVoice wallet. There is no extra game VAT or
    fee. Dias balances and character purchases are stored server-side.
-5. Load rewards are not cash withdrawals. A player can submit a claim for
+7. Load rewards are not cash withdrawals. A player can submit a claim for
    ₱10 mobile load (25,000 Coins) or ₱59 GoSURF load (60,000 Coins), entering
    the recipient name, email, and cellphone number. Claims are pending until
    an admin manually sends the load and marks it fulfilled, normally during
@@ -71,11 +91,11 @@ the user submits a new request.
    unlocked level; unlocking does not change the original run objective. There
    are 10 play attempts per local day, and restarting uses another attempt.
    Level unlocks and Coin balances are browser-local and are not server-verified.
-6. Withdrawals reserve the requested balance immediately. Admins approve the
+8. Wallet withdrawals reserve the requested balance immediately. Admins approve the
    request, send the payout manually to the submitted account, then mark it
    paid. Rejecting a request or a user's cancellation returns the reserved
    balance. Payout details are visible only to the requester and admins.
-7. Configure each future game's price and period under **Admin → Wallet**.
+9. Configure each future game's price and period under **Admin → Wallet**.
    The default example can be set to ₱1.00 per 30 minutes. Rates start
    inactive. Game backends should call
    `public.charge_game_period(user_id, game_key, session_id, period_number)`

@@ -33,6 +33,7 @@ export default async function Navbar() {
               <Link href="/wall/new" className="btn-primary">Create Post</Link>
               <Link href="/wallet" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Wallet</Link>
               <Link href="/games/campus-coin-rush" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Game</Link>
+              <Link href="/games/galactic-striker" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Galactic Striker</Link>
               <Link href="/profile" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Profile</Link>
               <Link href="/subscription" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Plans</Link>
               <Link href="/notifications" className="rounded-lg px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800">Notifications</Link>

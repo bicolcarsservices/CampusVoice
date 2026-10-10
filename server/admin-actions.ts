@@ -202,6 +202,47 @@ export async function adminReviewWalletWithdrawal(formData: FormData) {
   };
 }
 
+export async function adminReviewGalacticConversion(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const requestId = uuid.safeParse(formData.get("request_id"));
+  const decision = z.enum(["approved", "rejected"]).safeParse(formData.get("decision"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!requestId.success || !decision.success || !reason.success) return { error: "Invalid crystal conversion review." };
+  const { error } = await supabase.rpc("admin_review_galactic_conversion", {
+    p_request: requestId.data,
+    p_decision: decision.data,
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not review crystal conversion: ${error.message}` };
+  revalidatePath("/admin/galactic-striker");
+  revalidatePath("/games/galactic-striker");
+  return { success: decision.data === "approved" ? "Conversion approved and earnings credited." : "Conversion rejected." };
+}
+
+export async function adminReviewGalacticWithdrawal(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const requestId = uuid.safeParse(formData.get("request_id"));
+  const decision = z.enum(["approve", "reject", "paid"]).safeParse(formData.get("decision"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!requestId.success || !decision.success || !reason.success ||
+      (decision.data === "paid" && !reason.data)) return { error: "Enter a valid payout action and payment note." };
+  const { error } = await supabase.rpc("admin_review_galactic_withdrawal", {
+    p_request: requestId.data,
+    p_decision: decision.data,
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not update Galactic Striker payout: ${error.message}` };
+  revalidatePath("/admin/galactic-striker");
+  revalidatePath("/games/galactic-striker");
+  return {
+    success: decision.data === "paid" ? "Payout marked as paid." :
+      decision.data === "approve" ? "Payout approved. Send the net amount manually, then mark it paid." :
+        "Payout rejected and earnings balance returned.",
+  };
+}
+
 export async function adminSetWalletGameRate(formData: FormData) {
   const { supabase, error: accessError } = await getAdminClient();
   if (accessError) return { error: accessError };
