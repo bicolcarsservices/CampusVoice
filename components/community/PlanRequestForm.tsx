@@ -35,7 +35,7 @@ export default function PlanRequestForm({
     <div className="mt-4 space-y-3">
       {!showPayment ? (
         <button type="button" onClick={() => setShowPayment(true)} className="btn-primary w-full">
-          Continue to Maya payment
+          Get Plan
         </button>
       ) : (
         <section ref={paymentRef} className="space-y-3">

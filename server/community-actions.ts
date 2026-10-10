@@ -214,6 +214,30 @@ export async function createSubscriptionRequest(_: ActionState, formData: FormDa
   return { success: "Payment request sent. Your plan will activate after an administrator verifies your Maya payment." };
 }
 
+export async function startSubscriptionTrial(_: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in to start a plan trial." };
+
+  const planCode = z.enum(["basic", "premium"]).safeParse(formData.get("plan_code"));
+  if (!planCode.success) return { error: "Choose a valid trial plan." };
+
+  const { error } = await result.supabase.rpc("start_subscription_trial", {
+    p_plan_code: planCode.data,
+  });
+  if (error) {
+    if (error.message.includes("TRIAL_ALREADY_USED")) return { error: "The one-time 2-day trial has already been used on this account." };
+    if (error.message.includes("ACTIVE_SUBSCRIPTION_EXISTS")) return { error: "You already have an active subscription." };
+    if (error.message.includes("PENDING_SUBSCRIPTION_EXISTS")) return { error: "Resolve your pending subscription request before starting a trial." };
+    if (error.message.includes("INVALID_TRIAL_PLAN") || error.message.includes("PLAN_NOT_FOUND")) return { error: "That trial plan is unavailable." };
+    return { error: `Could not start your trial: ${error.message}` };
+  }
+
+  revalidatePath("/subscription");
+  revalidatePath("/profile");
+  revalidatePath("/games/galactic-striker");
+  return { success: `${planCode.data === "basic" ? "Basic" : "Premium"} 2-day trial started. No payment was taken; access ends automatically after 2 days.` };
+}
+
 export async function cancelMySubscription(_: ActionState, formData: FormData): Promise<ActionState> {
   const result = await getActiveUser();
   if (!result.user) return { error: result.error ?? "Please log in to manage your subscription." };

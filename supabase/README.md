@@ -17,6 +17,18 @@ the profile, and names matching an existing school are also linked to that
 school for feed filters and counts. Review the SQL output for errors before
 using updated features.
 
+## One-time 2-day subscription trial
+
+After `supabase/schema.sql`, run `supabase/subscription-trials.sql` in the
+Supabase SQL Editor. This adds the private trial-use record and the
+`start_subscription_trial` database function used by the Plans page. A signed-in
+account can select one Basic or Premium trial lasting exactly 2 days; the
+database enforces one trial per account and blocks starting while an active or
+pending subscription exists. Trials expire without an automatic payment. After
+the trial has been used, the plan cards show **Get Plan** for a paid subscription.
+If the migration has not been applied, the Plans page will report that setup is
+needed rather than silently treating the user as trial-eligible.
+
 ## Authentication URLs
 
 For local development, set the Supabase Auth Site URL to
@@ -125,7 +137,7 @@ Supabase Auth SMTP settings.
    that email in both places in the file if the registered account uses a
    different address.
 3. Verify the query returns your email with the `admin` role. Then log out and
-   back in; admins are sent to `/admin` and see an Admin link in the navbar.
+   back in, and open `/admin` to access the private admin workspace.
 
 Never place an admin password or a Supabase service-role key in application
 code or a browser environment variable. The browser should use only the

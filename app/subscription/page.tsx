@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PlanRequestForm from "@/components/community/PlanRequestForm";
+import PlanTrialForm, { TrialStatus } from "@/components/community/PlanTrialForm";
 import CancelSubscriptionForm from "@/components/community/CancelSubscriptionForm";
 import PaymongoStatusSync from "@/components/community/PaymongoStatusSync";
 
@@ -24,13 +25,18 @@ export default async function SubscriptionPage({
   if (plansError) throw new Error(`Could not load subscription plans: ${plansError.message}`);
   if (featuresError) throw new Error(`Could not load plan features: ${featuresError.message}`);
   if (subscriptionError) throw new Error(`Could not load subscription status: ${subscriptionError.message}`);
+  const { data: trial, error: trialError } = user
+    ? await supabase.from("subscription_trials").select("expires_at").eq("user_id", user.id).maybeSingle()
+    : { data: null, error: null };
+  const trialActive = Boolean(trial && new Date(trial.expires_at).getTime() > Date.now());
+  const hasActiveSubscription = subscription?.status === "basic" || subscription?.status === "premium";
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <header className="mx-auto max-w-2xl text-center">
         <p className="eyebrow">Plans that grow with your voice</p>
         <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan, pay using the Maya QR code, and submit your payment reference. An administrator will verify your payment before activating your plan. Expired plans are not charged automatically; subscribe again whenever you are ready.</p>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Eligible accounts can choose one free 2-day Basic or Premium trial. After the trial, choose Get Plan to pay using Maya QR. Payments are verified manually; plans never renew automatically.</p>
         {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
       {subscription?.status === "expired" && (
@@ -49,6 +55,12 @@ export default async function SubscriptionPage({
         <aside className="card">
           <h2 className="font-bold">Your subscription payment was refunded</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below to start a new subscription.</p>
+        </aside>
+      )}
+      {user && trialError && (
+        <aside role="alert" className="card border-amber-300 bg-amber-50 text-amber-950">
+          <h2 className="font-bold">The free trial is temporarily unavailable</h2>
+          <p className="mt-1 text-sm">We could not verify trial eligibility. Paid plans remain available. If this is a new setup, run <code>supabase/subscription-trials.sql</code> in the Supabase SQL Editor.</p>
         </aside>
       )}
       {typeof searchParams?.intent_id === "string" && (
@@ -84,6 +96,12 @@ export default async function SubscriptionPage({
               </ul>
               {plan.code === "free" ? (
                 <Link href={user ? "/wall" : "/register"} className="btn-ghost w-full">{user ? "Continue with Free" : "Get started"}</Link>
+              ) : user && trialActive && trial ? (
+                <TrialStatus text={`Your 2-day trial is active until ${new Date(trial.expires_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}.`} />
+              ) : user && subscription?.status === "pending" ? (
+                <TrialStatus text="Resolve your pending subscription request before starting a trial." />
+              ) : user && !trialError && !trial && !hasActiveSubscription && (plan.code === "basic" || plan.code === "premium") ? (
+                <PlanTrialForm planCode={plan.code} />
               ) : user ? (
                 <PlanRequestForm
                   planId={plan.id}
