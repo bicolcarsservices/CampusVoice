@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSchoolName } from "@/lib/schools";
+import { parsePhpAmount } from "@/lib/wallet";
 
 const uuidSchema = z.string().uuid();
 const contentSchema = z.string().trim().min(1).max(2000);
@@ -208,6 +209,83 @@ export async function createSubscriptionRequest(_: ActionState, formData: FormDa
 
   revalidatePath("/subscription");
   return { success: "Request sent. An administrator will review it; no payment was processed." };
+}
+
+export async function cancelMySubscription(_: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in to manage your subscription." };
+
+  const subscriptionId = uuidSchema.safeParse(formData.get("subscription_id"));
+  if (!subscriptionId.success) return { error: "Choose a valid subscription." };
+
+  const { error } = await result.supabase.rpc("cancel_my_subscription", {
+    p_sub: subscriptionId.data,
+  });
+  if (error) return { error: `Could not cancel subscription: ${error.message}` };
+
+  revalidatePath("/subscription");
+  revalidatePath("/profile");
+  return { success: "Your subscription has been cancelled." };
+}
+
+export async function requestWalletTopup(_: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in to top up your wallet." };
+  const amount = parsePhpAmount(formData.get("amount_php"));
+  const reference = z.string().trim().max(120).safeParse(formData.get("payment_reference") ?? "");
+  if (amount === null || !reference.success) {
+    return { error: "Enter an amount from ₱1 to ₱100,000 and a valid payment reference." };
+  }
+
+  const { error } = await result.supabase.rpc("request_wallet_topup", {
+    p_amount_centavos: amount,
+    p_payment_reference: reference.data || null,
+  });
+  if (error) return { error: `Could not submit top-up request: ${error.message}` };
+  revalidatePath("/wallet");
+  revalidatePath("/admin/wallet");
+  return { success: "Top-up request sent. Your balance will update after an admin verifies the Maya payment." };
+}
+
+export async function requestWalletWithdrawal(_: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in to request a withdrawal." };
+  const amount = parsePhpAmount(formData.get("amount_php"));
+  const method = z.enum(["Maya", "GCash", "Bank"]).safeParse(formData.get("payout_method"));
+  const accountName = z.string().trim().min(2).max(100).safeParse(formData.get("account_name"));
+  const accountNumber = z.string().trim().min(4).max(100).safeParse(formData.get("account_number"));
+  if (amount === null || !method.success || !accountName.success || !accountNumber.success) {
+    return { error: "Check the withdrawal amount and payout details." };
+  }
+
+  const { error } = await result.supabase.rpc("request_wallet_withdrawal", {
+    p_amount_centavos: amount,
+    p_payout_method: method.data,
+    p_account_name: accountName.data,
+    p_account_number: accountNumber.data,
+  });
+  if (error) {
+    if (error.message.includes("INSUFFICIENT_BALANCE")) return { error: "Your wallet balance is not enough for this withdrawal." };
+    return { error: `Could not submit withdrawal request: ${error.message}` };
+  }
+  revalidatePath("/wallet");
+  revalidatePath("/admin/wallet");
+  return { success: "Withdrawal request sent. The requested amount is reserved while an admin reviews and pays it." };
+}
+
+export async function cancelWalletWithdrawal(_: ActionState, formData: FormData): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in to manage your withdrawal." };
+  const requestId = uuidSchema.safeParse(formData.get("request_id"));
+  if (!requestId.success) return { error: "Choose a valid withdrawal request." };
+
+  const { error } = await result.supabase.rpc("cancel_my_wallet_withdrawal", {
+    p_request: requestId.data,
+  });
+  if (error) return { error: `Could not cancel withdrawal: ${error.message}` };
+  revalidatePath("/wallet");
+  revalidatePath("/admin/wallet");
+  return { success: "Withdrawal request cancelled and the reserved balance was returned." };
 }
 
 export async function updateProfile(_: ActionState, formData: FormData): Promise<ActionState> {

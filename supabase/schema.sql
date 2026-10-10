@@ -94,7 +94,7 @@ create table if not exists public.subscriptions (
   user_id uuid not null references public.profiles(id) on delete cascade,
   plan_id uuid not null references public.subscription_plans(id),
   status text not null default 'pending'
-    check (status in ('pending','active','expired','cancelled','rejected','suspended')),
+    check (status in ('pending','active','expired','cancelled','rejected','suspended','refunded')),
   starts_at timestamptz,
   expires_at timestamptz,
   payment_method text default 'manual',   -- later: 'gcash' | 'maya' | 'paymongo' | 'stripe'
@@ -103,6 +103,10 @@ create table if not exists public.subscriptions (
   verified_by uuid references auth.users(id),
   created_at timestamptz not null default now()
 );
+
+alter table public.subscriptions drop constraint if exists subscriptions_status_check;
+alter table public.subscriptions add constraint subscriptions_status_check
+  check (status in ('pending','active','expired','cancelled','rejected','suspended','refunded'));
 
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
@@ -410,21 +414,38 @@ end $$;
 -- For the UI: Free / Basic / Premium / Expired / Suspended
 create or replace function public.my_subscription() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
-declare uid uuid := auth.uid(); pstat text; plan public.subscription_plans; exp timestamptz;
+declare uid uuid := auth.uid(); pstat text; latest_status text; latest_expiry timestamptz;
+        plan public.subscription_plans; exp timestamptz; sid uuid;
 begin
   if uid is null then return null; end if;
   select status into pstat from public.profiles where id = uid;
+  select status, expires_at into latest_status, latest_expiry from public.subscriptions
+   where user_id = uid order by created_at desc limit 1;
   plan := public.effective_plan(uid);
   if plan.id is not null then
-    select max(expires_at) into exp from public.subscriptions
-     where user_id = uid and plan_id = plan.id and status = 'active' and expires_at > now();
+    select id, expires_at into sid, exp from public.subscriptions
+     where user_id = uid and plan_id = plan.id and status = 'active' and expires_at > now()
+     order by expires_at desc limit 1;
   end if;
   return jsonb_build_object(
     'status', case when pstat = 'suspended' then 'suspended'
                    when plan.id is not null then plan.code
-                   when exists (select 1 from public.subscriptions where user_id = uid and status = 'expired') then 'expired'
+                   when latest_status = 'expired' or (latest_status = 'active' and latest_expiry <= now()) then 'expired'
+                   when latest_status = 'cancelled' then 'cancelled'
+                   when latest_status = 'refunded' then 'refunded'
+                   when latest_status = 'pending' then 'pending'
                    else 'free' end,
-    'plan_name', plan.name, 'expires_at', exp);
+    'plan_name', plan.name, 'expires_at', exp, 'subscription_id', sid);
+end $$;
+
+create or replace function public.cancel_my_subscription(p_sub uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  update public.subscriptions
+     set status = 'cancelled'
+   where id = p_sub and user_id = auth.uid() and status = 'active';
+  if not found then raise exception 'SUBSCRIPTION_NOT_FOUND_OR_INACTIVE'; end if;
 end $$;
 
 -- Called by pg_cron (below). Not callable by clients.
@@ -1004,6 +1025,7 @@ begin
         'post_is_public', 'effective_plan', 'has_feature', 'free_daily_limit',
         'handle_new_user', 'create_post', 'update_my_post', 'delete_my_post',
         'delete_my_comment', 'my_post_quota', 'my_subscription',
+        'cancel_my_subscription',
         'expire_subscriptions', 'assert_admin', 'admin_log',
         'admin_set_post_status', 'admin_set_comment_status', 'admin_set_user_status',
         'admin_activate_subscription', 'admin_extend_subscription',
@@ -1028,6 +1050,7 @@ grant execute on function
   public.delete_my_comment(uuid),
   public.my_post_quota(),
   public.my_subscription(),
+  public.cancel_my_subscription(uuid),
   public.admin_stats(),
   public.admin_set_post_status(uuid, text, text),
   public.admin_set_comment_status(uuid, text, text),

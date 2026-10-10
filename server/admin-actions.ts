@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { parsePhpAmount } from "@/lib/wallet";
 
 const uuid = z.string().uuid();
 
@@ -95,6 +96,106 @@ export async function adminActivateSubscription(formData: FormData) {
   revalidatePath("/subscription");
   revalidatePath("/profile");
   return { success: "Subscription activated and audit-logged." };
+}
+
+export async function adminCancelSubscription(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const subscriptionId = uuid.safeParse(formData.get("subscription_id"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!subscriptionId.success || !reason.success) return { error: "Invalid subscription action." };
+  const { error } = await supabase.rpc("admin_cancel_subscription", {
+    p_sub: subscriptionId.data,
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not cancel subscription: ${error.message}` };
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/subscription");
+  revalidatePath("/profile");
+  return { success: "Subscription cancelled and audit-logged." };
+}
+
+export async function adminMarkPaymongoRefunded(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const subscriptionId = uuid.safeParse(formData.get("subscription_id"));
+  const reason = z.string().trim().min(1).max(500).safeParse(formData.get("reason") ?? "");
+  if (!subscriptionId.success || !reason.success) {
+    return { error: "Confirm the refund in PayMongo and enter a verification note." };
+  }
+  const { error } = await supabase.rpc("admin_mark_paymongo_refunded", {
+    p_sub: subscriptionId.data,
+    p_reason: reason.data,
+  });
+  if (error) return { error: `Could not update refund status: ${error.message}` };
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/subscription");
+  revalidatePath("/profile");
+  return { success: "Refund status updated and audit-logged." };
+}
+
+export async function adminReviewWalletTopup(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const requestId = uuid.safeParse(formData.get("request_id"));
+  const decision = z.enum(["approve", "reject"]).safeParse(formData.get("decision"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!requestId.success || !decision.success || !reason.success) return { error: "Invalid top-up review." };
+  const { error } = await supabase.rpc("admin_review_wallet_topup", {
+    p_request: requestId.data,
+    p_approve: decision.data === "approve",
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not review top-up: ${error.message}` };
+  revalidatePath("/admin/wallet");
+  revalidatePath("/wallet");
+  return { success: decision.data === "approve" ? "Top-up verified and balance credited." : "Top-up request rejected." };
+}
+
+export async function adminReviewWalletWithdrawal(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const requestId = uuid.safeParse(formData.get("request_id"));
+  const decision = z.enum(["approve", "reject", "paid"]).safeParse(formData.get("decision"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!requestId.success || !decision.success || !reason.success) return { error: "Invalid withdrawal review." };
+  const { error } = await supabase.rpc("admin_review_wallet_withdrawal", {
+    p_request: requestId.data,
+    p_decision: decision.data,
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not update withdrawal: ${error.message}` };
+  revalidatePath("/admin/wallet");
+  revalidatePath("/wallet");
+  return {
+    success: decision.data === "paid" ? "Withdrawal marked as paid." :
+      decision.data === "approve" ? "Withdrawal approved. Complete the manual payout, then mark it paid." :
+        "Withdrawal rejected and balance returned.",
+  };
+}
+
+export async function adminSetWalletGameRate(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const gameKey = z.string().trim().regex(/^[a-z0-9][a-z0-9_-]{1,59}$/).safeParse(formData.get("game_key"));
+  const gameName = z.string().trim().min(1).max(80).safeParse(formData.get("game_name"));
+  const amount = parsePhpAmount(formData.get("price_php"));
+  const period = z.coerce.number().int().min(1).max(1440).safeParse(formData.get("period_minutes"));
+  const active = formData.get("is_active") === "true";
+  if (!gameKey.success || !gameName.success || amount === null || !period.success) {
+    return { error: "Enter a valid game key, name, price (₱1–₱100,000), and billing period (1–1,440 minutes)." };
+  }
+  const { error } = await supabase.rpc("admin_set_wallet_game_rate", {
+    p_game_key: gameKey.data,
+    p_game_name: gameName.data,
+    p_price_centavos: amount,
+    p_period_minutes: period.data,
+    p_is_active: active,
+  });
+  if (error) return { error: `Could not save game rate: ${error.message}` };
+  revalidatePath("/admin/wallet");
+  revalidatePath("/wallet");
+  return { success: "Game charge rate saved." };
 }
 
 export async function saveWebsiteSetting(formData: FormData) {

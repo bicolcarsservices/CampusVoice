@@ -25,6 +25,7 @@ export default async function AdminPage() {
         <Link className="card hover:border-violet-300" href="/admin/posts"><h2 className="font-bold">Review posts →</h2><p className="mt-1 text-sm text-slate-500">Approve, hide, reject, or restore content.</p></Link>
         <Link className="card hover:border-violet-300" href="/admin/reports"><h2 className="font-bold">Review reports →</h2><p className="mt-1 text-sm text-slate-500">Handle safety reports and log resolutions.</p></Link>
         <Link className="card hover:border-violet-300" href="/admin/users"><h2 className="font-bold">Manage users →</h2><p className="mt-1 text-sm text-slate-500">Search members and manage account status.</p></Link>
+        <Link className="card hover:border-violet-300" href="/admin/wallet"><h2 className="font-bold">Manage game wallet →</h2><p className="mt-1 text-sm text-slate-500">Verify Maya top-ups, review cash-out requests, and set game rates.</p></Link>
         <Link className="card hover:border-violet-300" href="/admin/settings"><h2 className="font-bold">Website settings →</h2><p className="mt-1 text-sm text-slate-500">Update posting limits and moderation switches.</p></Link>
       </div>
     </section>

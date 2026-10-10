@@ -46,6 +46,20 @@ export async function POST(request: Request) {
   }
 
   const attributes = event.data?.attributes;
+  if (attributes?.type === "payment.refunded") {
+    const intentId = attributes.data?.attributes?.payment_intent_id;
+    if (!intentId) return new NextResponse("Invalid refund event.", { status: 400 });
+
+    const { data, error } = await createAdminClient().rpc("process_paymongo_refund", {
+      p_intent_id: intentId,
+    });
+    if (error) {
+      console.error("Could not process PayMongo refund webhook", error);
+      return new NextResponse("Could not process refund event.", { status: 500 });
+    }
+    return NextResponse.json({ ok: true, result: data });
+  }
+
   if (attributes?.type !== "payment.paid" && attributes?.type !== "payment.failed") {
     return NextResponse.json({ ok: true });
   }

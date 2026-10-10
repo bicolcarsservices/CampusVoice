@@ -2,10 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PlanRequestForm from "@/components/community/PlanRequestForm";
 import GcashCheckout from "@/components/community/GcashCheckout";
+import CancelSubscriptionForm from "@/components/community/CancelSubscriptionForm";
+import PaymongoStatusSync from "@/components/community/PaymongoStatusSync";
 
 export const dynamic = "force-dynamic";
 
-export default async function SubscriptionPage() {
+export default async function SubscriptionPage({
+  searchParams,
+}: {
+  searchParams?: { intent_id?: string | string[] };
+}) {
   const supabase = createClient();
   const [{ data: plans, error: plansError }, { data: features, error: featuresError },
     { data: { user } }, { data: subscription, error: subscriptionError }] = await Promise.all([
@@ -25,9 +31,39 @@ export default async function SubscriptionPage() {
       <header className="mx-auto max-w-2xl text-center">
         <p className="eyebrow">Plans that grow with your voice</p>
         <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan and pay securely with GCash, or submit a manual payment request for admin review.</p>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan and pay securely with GCash, or submit a manual payment request for admin review. Expired plans are not charged automatically; subscribe again whenever you are ready.</p>
         {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
+      {subscription?.status === "expired" && (
+        <aside className="card border-amber-300 bg-amber-50 text-amber-950">
+          <h2 className="font-bold">Your subscription has expired</h2>
+          <p className="mt-1 text-sm">Choose a plan below to subscribe again. You will review and complete a new payment.</p>
+        </aside>
+      )}
+      {subscription?.status === "cancelled" && (
+        <aside className="card">
+          <h2 className="font-bold">Your subscription is cancelled</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below whenever you are ready to subscribe again.</p>
+        </aside>
+      )}
+      {subscription?.status === "refunded" && (
+        <aside className="card">
+          <h2 className="font-bold">Your subscription payment was refunded</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below to start a new subscription.</p>
+        </aside>
+      )}
+      {typeof searchParams?.intent_id === "string" && (
+        <aside className="card space-y-2">
+          <p className="font-semibold">Checking your GCash payment</p>
+          <PaymongoStatusSync intentId={searchParams.intent_id} autoSync />
+        </aside>
+      )}
+      {subscription?.subscription_id && (
+        <aside className="card">
+          <p className="text-sm text-slate-600 dark:text-slate-300">You may cancel your active plan at any time. Cancellation ends access immediately.</p>
+          <CancelSubscriptionForm subscriptionId={subscription.subscription_id} />
+        </aside>
+      )}
       <div className="grid items-stretch gap-5 md:grid-cols-3">
         {(plans ?? []).map((plan) => {
           const planFeatures = (features ?? []).filter((feature) => feature.plan_id === plan.id);

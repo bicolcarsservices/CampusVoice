@@ -28,9 +28,10 @@ use the HTTPS production origin instead.
 ## PayMongo GCash payments
 
 1. Apply `supabase/schema.sql`, then run `supabase/paymongo.sql` in the
-   Supabase SQL Editor. The second file adds the private payment-attempt table
-   and the database function that activates subscriptions only after a
-   confirmed, amount-matched payment.
+   Supabase SQL Editor. Re-run both files after subscription/payment updates.
+   The PayMongo file adds the private payment-attempt table and functions that
+   activate subscriptions only after a confirmed, amount-matched payment and
+   mark confirmed refunds in the dashboard.
 2. Add `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET`,
    `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL` to `.env.local`.
    Use PayMongo test credentials (`sk_test_...` and the matching webhook
@@ -40,13 +41,43 @@ use the HTTPS production origin instead.
    `localhost` alone is not reachable by PayMongo.
 3. Configure a PayMongo webhook to reach
    `https://<your-site>/api/webhooks/paymongo` and subscribe to
-   `payment.paid` and `payment.failed`. Set `NEXT_PUBLIC_SITE_URL` to the
-   public HTTPS origin in production so GCash returns to the subscription
-   page.
+   `payment.paid`, `payment.failed`, and `payment.refunded`. Set
+   `NEXT_PUBLIC_SITE_URL` to the public HTTPS origin in production so GCash
+   returns to the subscription page. The return page also checks the payment
+   intent directly with PayMongo to recover when a payment webhook is delayed
+   or missed; administrators can run the same status check from the
+   subscriptions dashboard. For older refunds whose webhook was not received,
+   administrators can mark the payment refunded only after verifying the full
+   refund in PayMongo; the action requires an audit note.
 4. Verify a payment using PayMongo's test environment before switching to live
    credentials. The app does not simulate successful payments; a subscription
-   becomes active only after a valid signed webhook confirms its amount and
-   currency.
+   becomes active only after PayMongo confirms its amount and currency.
+   Subscriptions are not charged or renewed automatically after expiry: users
+   can select a plan and pay again when ready. Users and administrators can
+   cancel an active subscription at any time; cancellation ends access
+   immediately.
+
+## Game wallet and manual Maya top-ups
+
+1. Run `supabase/wallet.sql` after `supabase/schema.sql` in the SQL Editor.
+   This creates the protected wallet ledger, manual top-up and withdrawal
+   requests, admin review functions, and game-period charging functions.
+2. Put the Maya QR image at `public/maya-qr.png` to show it on `/wallet`.
+   Users submit the amount and payment reference after sending the payment;
+   no balance is added until an admin verifies it under **Admin → Wallet**.
+3. Withdrawals reserve the requested balance immediately. Admins approve the
+   request, send the payout manually to the submitted account, then mark it
+   paid. Rejecting a request or a user's cancellation returns the reserved
+   balance. Payout details are visible only to the requester and admins.
+4. Configure each future game's price and period under **Admin → Wallet**.
+   The default example can be set to ₱1.00 per 30 minutes. Rates start
+   inactive. Game backends should call
+   `public.charge_game_period(user_id, game_key, session_id, period_number)`
+   once per validated billing period; repeated calls for the same session
+   period are idempotent. Call this from a trusted game server after checking
+   the player's session, not before access is authorized. The function
+   deducts one configured period at a time and fails if the balance is too
+   low.
 
 ## Email signup limits
 
@@ -79,8 +110,9 @@ project URL and anon/publishable key.
 The app includes signup/login/email verification and password reset, public
 profiles, posting with server-side database quota enforcement, comments,
 reactions, reports, schools/categories, notifications, manual subscription
-requests, PayMongo GCash subscription checkout, and admin pages for
-moderation, users, plans, settings, schools, categories, and announcements.
+requests, PayMongo GCash subscription checkout, manual Maya game-wallet
+top-ups and withdrawals, and admin pages for moderation, users, plans,
+settings, wallet management, schools, categories, and announcements.
 
 Manual requests do not process or confirm payments. Some items in the
 original product brief remain future work, including username-based login, profile

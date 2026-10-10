@@ -92,7 +92,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const returnUrl = new URL("/subscription", siteUrl);
     const intent = await paymongo("/payment_intents", {
       amount,
       currency: "PHP",
@@ -102,6 +101,8 @@ export async function POST(request: Request) {
     });
     if (!intent.attributes.client_key) throw new Error("PayMongo returned no payment client key.");
 
+    const returnUrl = new URL("/subscription", siteUrl);
+    returnUrl.searchParams.set("intent_id", intent.id);
     const attached = await paymongo(`/payment_intents/${intent.id}/attach`, {
       payment_method: (await paymongo("/payment_methods", { type: "gcash" })).id,
       client_key: intent.attributes.client_key,
