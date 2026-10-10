@@ -77,49 +77,58 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .text-action { color: #5e39c4; font-weight: 650; }
 summary { list-style-position: inside; }
 
-.bottom-navigation {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 40;
+.public-navigation {
   display: flex;
-  min-height: 68px;
-  align-items: stretch;
-  justify-content: center;
-  gap: .25rem;
-  border-top: 1px solid #e8e6ef;
-  background: rgba(255, 255, 255, .97);
-  padding: .35rem max(.5rem, env(safe-area-inset-right)) calc(.35rem + env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
-  box-shadow: 0 -6px 24px rgba(37, 26, 72, .08);
-  backdrop-filter: blur(14px);
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
 }
-.bottom-nav-link {
+.public-brand {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: .5rem;
+  color: var(--brand);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+.public-nav-links, .public-nav-account {
   display: flex;
-  min-width: 0;
-  flex: 1 1 0;
-  flex-direction: column;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: .25rem;
+}
+.public-nav-links { justify-content: center; }
+.public-nav-account { margin-left: auto; }
+.public-nav-button {
+  display: inline-flex;
+  min-height: 38px;
   align-items: center;
   justify-content: center;
-  gap: .1rem;
+  gap: .3rem;
+  border: 1px solid transparent;
   border-radius: 10px;
-  padding: .25rem .35rem;
+  padding: .45rem .62rem;
   color: #4b465b;
-  font-size: .72rem;
-  font-weight: 650;
-  line-height: 1.15;
-  text-align: center;
+  font-size: .84rem;
+  font-weight: 600;
   white-space: nowrap;
 }
-.bottom-nav-link > span:first-child { font-size: 1.05rem; line-height: 1.1; }
-.bottom-nav-link:hover, .bottom-nav-link:focus-visible { background: #f2effb; color: var(--brand-dark); }
-.games-menu { position: relative; display: flex; min-width: 0; flex: 1 1 0; }
+.public-nav-button:hover, .public-nav-button:focus-visible {
+  border-color: #e8e2f7;
+  background: #f6f3fc;
+  color: var(--brand-dark);
+}
+.public-nav-highlight { color: var(--brand); }
+.public-nav-admin { color: #5b34c4; font-weight: 750; }
+.games-menu { position: relative; flex: 0 0 auto; }
 .games-menu summary { list-style: none; cursor: pointer; }
 .games-menu summary::-webkit-details-marker { display: none; }
 .games-menu-panel {
   position: absolute;
-  bottom: calc(100% + .45rem);
-  top: auto;
+  top: calc(100% + .45rem);
   left: 0;
   z-index: 30;
   display: grid;
@@ -133,7 +142,6 @@ summary { list-style-position: inside; }
 }
 .games-menu-item { border-radius: 9px; padding: .65rem .75rem; font-weight: 600; }
 .games-menu-item:hover, .games-menu-item:focus-visible { background: #f2effb; color: var(--brand-dark); }
-.site-footer { padding-bottom: 5rem; }
 .site-footer a { text-underline-offset: 3px; }
 .site-footer a:hover { color: #c4b5fd; text-decoration: underline; }
 
@@ -147,9 +155,9 @@ summary { list-style-position: inside; }
   .comment-bubble { background: #22202d; }
   .tag { background: #2b2440; color: #c5b3ff; }
   header.site-header { border-color: #2c2938; background: rgba(17,17,26,.9); }
-  .bottom-navigation { border-color: #2c2938; background: rgba(17,17,26,.96); }
-  .bottom-nav-link { color: #d0ccdb; }
-  .bottom-nav-link:hover, .bottom-nav-link:focus-visible { background: #242130; color: #d4c6ff; }
+  .public-nav-button { color: #d0ccdb; }
+  .public-nav-button:hover, .public-nav-button:focus-visible { border-color: #3b3748; background: #242130; color: #d4c6ff; }
+  .public-nav-admin { color: #d4c6ff; }
   .games-menu-panel { border-color: #3b3748; background: #191823; }
   .games-menu-item:hover, .games-menu-item:focus-visible { background: #242130; color: #d4c6ff; }
   .text-slate-500, .text-slate-600 { color: #b6b2c4; }
@@ -157,6 +165,13 @@ summary { list-style-position: inside; }
 }
 
 @media (max-width: 420px) {
-  .bottom-navigation { gap: 0; padding-right: .25rem; padding-left: .25rem; }
-  .bottom-nav-link { padding-right: .1rem; padding-left: .1rem; font-size: .63rem; }
+  .public-navigation { flex-wrap: wrap; gap: .4rem; }
+  .public-nav-links { order: 3; width: 100%; justify-content: flex-start; overflow-x: auto; }
+  .public-nav-account { margin-left: auto; }
+}
+
+@media (min-width: 421px) and (max-width: 1050px) {
+  .public-navigation { flex-wrap: wrap; }
+  .public-nav-links { order: 3; width: 100%; justify-content: flex-start; overflow-x: auto; }
+  .public-nav-account { margin-left: auto; }
 }

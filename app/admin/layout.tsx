@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <div><p className="eyebrow">Private workspace</p><h1 className="text-3xl font-extrabold">Admin dashboard</h1></div>
           <Link href="/" className="btn-ghost">View public site</Link>
         </div>
-        <nav aria-label="Admin navigation" className="flex flex-wrap gap-2 rounded-2xl border border-violet-200 bg-white p-2 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <nav aria-label="Admin navigation" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 text-sm dark:border-slate-800">
           {[["Overview", "/admin"], ["Posts", "/admin/posts"], ["Comments", "/admin/comments"], ["Reports", "/admin/reports"], ["Users", "/admin/users"],
             ["Subscriptions", "/admin/subscriptions"], ["Wallet", "/admin/wallet"], ["Game rewards", "/admin/game-rewards"], ["Galactic Striker", "/admin/galactic-striker"], ["Plans", "/admin/plans"], ["Settings", "/admin/settings"],
             ["Announcements", "/admin/announcements"], ["Schools", "/admin/schools"],
