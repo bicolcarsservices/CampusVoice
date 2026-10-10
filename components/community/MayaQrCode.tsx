@@ -14,7 +14,7 @@ export default function MayaQrCode() {
   return (
     <img
       src="/maya-qr.jpg"
-      alt="Maya QR code for wallet top-ups"
+      alt="Maya QR code for payments"
       className="mx-auto max-h-80 rounded-xl border border-slate-200 object-contain"
       onError={() => setAvailable(false)}
     />

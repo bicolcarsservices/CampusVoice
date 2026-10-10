@@ -195,12 +195,15 @@ export async function createSubscriptionRequest(_: ActionState, formData: FormDa
   const planId = uuidSchema.safeParse(formData.get("plan_id"));
   if (!planId.success) return { error: "Choose a valid plan." };
 
+  const paymentReference = z.string().trim().min(1).max(100).safeParse(formData.get("payment_reference"));
+  if (!paymentReference.success) return { error: "Enter the Maya payment reference or sender name." };
+
   const { error } = await result.supabase.from("subscriptions").insert({
     user_id: result.user.id,
     plan_id: planId.data,
     status: "pending",
-    payment_method: "manual",
-    payment_reference: String(formData.get("payment_reference") ?? "").trim() || null,
+    payment_method: "maya",
+    payment_reference: paymentReference.data,
   });
   if (error) {
     if (error.code === "23505") return { error: "You already have a pending subscription request." };
@@ -208,7 +211,7 @@ export async function createSubscriptionRequest(_: ActionState, formData: FormDa
   }
 
   revalidatePath("/subscription");
-  return { success: "Request sent. An administrator will review it; no payment was processed." };
+  return { success: "Payment request sent. Your plan will activate after an administrator verifies your Maya payment." };
 }
 
 export async function cancelMySubscription(_: ActionState, formData: FormData): Promise<ActionState> {

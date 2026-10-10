@@ -6,21 +6,61 @@ import { createClient } from "@/lib/supabase/server";
 const API = "https://api.paymongo.com/v1";
 const requestSchema = z.object({ planId: z.string().uuid() });
 
-async function paymongo(path: string, attributes: Record<string, unknown>) {
-  const secret = process.env.PAYMONGO_SECRET_KEY;
-  if (!secret) throw new Error("PayMongo is not configured.");
+class CheckoutError extends Error {
+  constructor(
+    message: string,
+    readonly stage: string,
+    readonly providerCode?: string,
+    readonly providerStatus?: number,
+  ) {
+    super(message);
+  }
+}
 
-  const response = await fetch(`${API}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${secret}:`).toString("base64")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ data: { attributes } }),
-  });
-  const body = await response.json();
+async function paymongo(path: string, attributes: Record<string, unknown>, stage: string) {
+  const secret = process.env.PAYMONGO_SECRET_KEY;
+  if (!secret) throw new CheckoutError("PayMongo is not configured.", stage);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API}${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${secret}:`).toString("base64")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ data: { attributes } }),
+    });
+  } catch (cause) {
+    throw new CheckoutError(
+      cause instanceof Error ? cause.message : "Network request failed",
+      stage,
+    );
+  }
+
+  let body: {
+    data?: {
+      id?: string;
+      attributes?: { client_key?: string; next_action?: { redirect?: { url?: string } } };
+    };
+    errors?: Array<{ code?: string; detail?: string }>;
+  };
+  try {
+    body = await response.json();
+  } catch {
+    throw new CheckoutError("PayMongo returned an unreadable response.", stage, undefined, response.status);
+  }
   if (!response.ok) {
-    throw new Error(`PayMongo request failed: ${JSON.stringify(body.errors ?? body)}`);
+    const providerError = body.errors?.[0];
+    throw new CheckoutError(
+      providerError?.detail ?? "PayMongo rejected the checkout request.",
+      stage,
+      providerError?.code,
+      response.status,
+    );
+  }
+  if (!body.data?.id || !body.data.attributes) {
+    throw new CheckoutError("PayMongo returned an incomplete response.", stage, undefined, response.status);
   }
   return body.data as {
     id: string;
@@ -72,6 +112,12 @@ export async function POST(request: Request) {
     console.error("GCash checkout configuration is incomplete.");
     return NextResponse.json({ error: "Online payments are not configured yet." }, { status: 503 });
   }
+  if (process.env.NODE_ENV === "production" && process.env.PAYMONGO_SECRET_KEY.startsWith("sk_test_")) {
+    console.error("GCash checkout is configured with a PayMongo test key in production.");
+    return NextResponse.json({
+      error: "GCash checkout is in test mode. Configure PayMongo live credentials to accept real GCash payments.",
+    }, { status: 503 });
+  }
 
   const admin = createAdminClient();
   const { data: pendingSubscription, error: pendingError } = await admin
@@ -98,19 +144,29 @@ export async function POST(request: Request) {
       payment_method_allowed: ["gcash"],
       capture_type: "automatic",
       description: `CampusVoice ${plan.name}`,
-    });
-    if (!intent.attributes.client_key) throw new Error("PayMongo returned no payment client key.");
+    }, "create_payment_intent");
+    if (!intent.attributes.client_key) {
+      throw new CheckoutError("PayMongo returned no payment client key.", "create_payment_intent");
+    }
 
     const returnUrl = new URL("/subscription", siteUrl);
     returnUrl.searchParams.set("intent_id", intent.id);
+    const paymentMethod = await paymongo("/payment_methods", { type: "gcash" }, "create_payment_method");
     const attached = await paymongo(`/payment_intents/${intent.id}/attach`, {
-      payment_method: (await paymongo("/payment_methods", { type: "gcash" })).id,
+      payment_method: paymentMethod.id,
       client_key: intent.attributes.client_key,
       return_url: returnUrl.toString(),
-    });
+    }, "attach_payment_method");
     const redirectUrl = attached.attributes.next_action?.redirect?.url;
-    if (!redirectUrl || new URL(redirectUrl).protocol !== "https:") {
-      throw new Error("PayMongo returned no secure GCash redirect URL.");
+    let secureRedirectUrl: URL;
+    try {
+      if (!redirectUrl) throw new Error("missing URL");
+      secureRedirectUrl = new URL(redirectUrl);
+    } catch {
+      throw new CheckoutError("PayMongo returned no valid GCash redirect URL.", "attach_payment_method");
+    }
+    if (secureRedirectUrl.protocol !== "https:") {
+      throw new CheckoutError("PayMongo returned a non-HTTPS GCash redirect URL.", "attach_payment_method");
     }
 
     const { data: subscription, error: subscriptionError } = await admin
@@ -124,7 +180,13 @@ export async function POST(request: Request) {
       })
       .select("id")
       .single();
-    if (subscriptionError) throw subscriptionError;
+    if (subscriptionError) {
+      console.error("Could not save GCash subscription after PayMongo checkout creation", {
+        code: subscriptionError.code,
+        message: subscriptionError.message,
+      });
+      throw new CheckoutError("Could not save the subscription request.", "save_subscription");
+    }
 
     const { error: paymentError } = await admin.from("paymongo_payments").insert({
       subscription_id: subscription.id,
@@ -136,7 +198,11 @@ export async function POST(request: Request) {
     if (paymentError) {
       const { error: cleanupError } = await admin.from("subscriptions").delete().eq("id", subscription.id);
       if (cleanupError) console.error("Could not clean up pending GCash subscription", cleanupError);
-      throw paymentError;
+      console.error("Could not save PayMongo payment record", {
+        code: paymentError.code,
+        message: paymentError.message,
+      });
+      throw new CheckoutError("Could not save the payment record.", "save_payment");
     }
 
     return NextResponse.json({ redirectUrl });
@@ -146,7 +212,35 @@ export async function POST(request: Request) {
         error: "A pending subscription request already exists. Wait for admin review or contact an administrator before trying GCash again.",
       }, { status: 409 });
     }
-    console.error("GCash checkout failed", error);
-    return NextResponse.json({ error: "Could not start the GCash payment. Please try again." }, { status: 502 });
+    if (error instanceof CheckoutError) {
+      console.error("GCash checkout failed", {
+        stage: error.stage,
+        providerStatus: error.providerStatus,
+        providerCode: error.providerCode,
+        message: error.message,
+      });
+      if (error.providerStatus === 401 || error.providerStatus === 403) {
+        return NextResponse.json({
+          error: "PayMongo rejected the API credentials. Check that PAYMONGO_SECRET_KEY is a valid secret key for the selected test or live mode.",
+        }, { status: 502 });
+      }
+      if (error.providerCode?.toLowerCase().includes("payment_method")) {
+        return NextResponse.json({
+          error: "PayMongo could not use GCash for this account or checkout. Check that GCash is enabled for this PayMongo mode and review the server logs.",
+        }, { status: 502 });
+      }
+      if (error.stage === "save_subscription" || error.stage === "save_payment") {
+        return NextResponse.json({
+          error: "PayMongo checkout started, but the subscription could not be saved. Check the server logs before trying again.",
+        }, { status: 502 });
+      }
+      return NextResponse.json({
+        error: `PayMongo checkout failed during ${error.stage.replaceAll("_", " ")}. Check the deployment logs for the provider error; do not share secret keys.`,
+      }, { status: 502 });
+    }
+    console.error("GCash checkout failed unexpectedly", error);
+    return NextResponse.json({
+      error: "Could not start the GCash payment because of an unexpected server error. Check the deployment logs.",
+    }, { status: 502 });
   }
 }

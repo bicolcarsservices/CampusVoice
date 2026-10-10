@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import PlanRequestForm from "@/components/community/PlanRequestForm";
-import GcashCheckout from "@/components/community/GcashCheckout";
 import CancelSubscriptionForm from "@/components/community/CancelSubscriptionForm";
 import PaymongoStatusSync from "@/components/community/PaymongoStatusSync";
 
@@ -31,7 +30,7 @@ export default async function SubscriptionPage({
       <header className="mx-auto max-w-2xl text-center">
         <p className="eyebrow">Plans that grow with your voice</p>
         <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan and pay securely with GCash, or submit a manual payment request for admin review. Expired plans are not charged automatically; subscribe again whenever you are ready.</p>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Choose a plan, pay using the Maya QR code, and submit your payment reference. An administrator will verify your payment before activating your plan. Expired plans are not charged automatically; subscribe again whenever you are ready.</p>
         {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
       {subscription?.status === "expired" && (
@@ -86,13 +85,11 @@ export default async function SubscriptionPage({
               {plan.code === "free" ? (
                 <Link href={user ? "/wall" : "/register"} className="btn-ghost w-full">{user ? "Continue with Free" : "Get started"}</Link>
               ) : user ? (
-                <>
-                  <GcashCheckout planId={plan.id} planName={plan.name} />
-                  <details className="mt-3 text-sm">
-                    <summary className="cursor-pointer text-slate-600 dark:text-slate-300">Use a manual payment request instead</summary>
-                    <PlanRequestForm planId={plan.id} />
-                  </details>
-                </>
+                <PlanRequestForm
+                  planId={plan.id}
+                  planName={plan.name}
+                  pricePhp={Number(plan.price_php)}
+                />
               ) : (
                 <Link href="/login" className="btn-primary w-full">Log in to request</Link>
               )}
@@ -100,7 +97,7 @@ export default async function SubscriptionPage({
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-500">GCash subscriptions activate after PayMongo confirms payment. Manual requests require administrator review. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>
+      <p className="text-center text-xs text-slate-500">Maya payments are verified manually by an administrator before a subscription is activated. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>
     </div>
   );
 }

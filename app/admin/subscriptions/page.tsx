@@ -15,7 +15,7 @@ export default async function AdminSubscriptionsPage() {
 
   return (
     <section className="space-y-4">
-      <div><h2 className="text-2xl font-bold">Subscription requests</h2><p className="text-sm text-slate-500">Manual requests require review. GCash subscriptions activate automatically after PayMongo confirms payment.</p></div>
+      <div><h2 className="text-2xl font-bold">Subscription requests</h2><p className="text-sm text-slate-500">Verify Maya payment references in your Maya account before activating manual subscription requests. Older PayMongo GCash checkouts are verified automatically.</p></div>
       {!requests?.length && <p className="card text-slate-500">No subscription requests yet.</p>}
       {(requests ?? []).map((request) => {
         const profile = Array.isArray(request.profiles) ? request.profiles[0] : request.profiles;

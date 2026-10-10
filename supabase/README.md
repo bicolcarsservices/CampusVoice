@@ -25,44 +25,29 @@ For local development, set the Supabase Auth Site URL to
 `NEXT_PUBLIC_SITE_URL=http://localhost:3000` in `.env.local`. For deployment,
 use the HTTPS production origin instead.
 
-## PayMongo GCash payments
+## Subscription payments with Maya QR
 
-1. Apply `supabase/schema.sql`, then run `supabase/paymongo.sql` in the
-   Supabase SQL Editor. Re-run both files after subscription/payment updates.
-   The PayMongo file adds the private payment-attempt table and functions that
-   activate subscriptions only after a confirmed, amount-matched payment and
-   mark confirmed refunds in the dashboard.
-2. Add `PAYMONGO_SECRET_KEY`, `PAYMONGO_WEBHOOK_SECRET`,
-   `SUPABASE_SERVICE_ROLE_KEY`, and `NEXT_PUBLIC_SITE_URL` to `.env.local`.
-   Use PayMongo test credentials (`sk_test_...` and the matching webhook
-   signing secret) during development. Never expose these values to the
-   browser or commit them. Since PayMongo needs to reach the webhook and
-   GCash must return to your app, local testing needs a public HTTPS tunnel;
-   `localhost` alone is not reachable by PayMongo.
-3. Configure a PayMongo webhook to reach
-   `https://<your-site>/api/webhooks/paymongo` and subscribe to
-   `payment.paid`, `payment.failed`, and `payment.refunded`. Set
-   `NEXT_PUBLIC_SITE_URL` to the public HTTPS origin in production so GCash
-   returns to the subscription page. The return page also checks the payment
-   intent directly with PayMongo to recover when a payment webhook is delayed
-   or missed; administrators can run the same status check from the
-   subscriptions dashboard. For older refunds whose webhook was not received,
-   administrators can mark the payment refunded only after verifying the full
-   refund in PayMongo; the action requires an audit note.
-4. Verify a payment using PayMongo's test environment before switching to live
-   credentials. The app does not simulate successful payments; a subscription
-   becomes active only after PayMongo confirms its amount and currency.
-   Subscriptions are not charged or renewed automatically after expiry: users
-   can select a plan and pay again when ready. Users and administrators can
-   cancel an active subscription at any time; cancellation ends access
-   immediately.
+Subscription requests use a manual Maya QR payment; no PayMongo live account or
+business verification is needed for this flow. Put the Maya QR image for the
+account that will receive payments at `public/maya-qr.jpg`. Users scan the QR,
+pay the exact plan amount, and submit their payment reference or sender name.
+An administrator must verify the payment in Maya and activate the request under
+**Admin → Subscriptions**. Do not activate a request before confirming that the
+payment arrived. This is a one-time payment per selected plan period, not an
+automatic recurring charge.
+
+The previous PayMongo GCash checkout and webhook support remains available for
+existing pending payments, but new subscription requests use the manual Maya
+QR flow. An administrator can cancel an abandoned pending GCash request before
+the user submits a new request.
 
 ## Game wallet and manual Maya top-ups
 
 1. Run `supabase/wallet.sql` after `supabase/schema.sql` in the SQL Editor.
    This creates the protected wallet ledger, manual top-up and withdrawal
    requests, admin review functions, and game-period charging functions.
-2. Put the Maya QR image at `public/maya-qr.png` to show it on `/wallet`.
+2. Put the Maya QR image at `public/maya-qr.jpg` to show it on `/wallet` and
+   subscription plans.
    Users submit the amount and payment reference after sending the payment;
    no balance is added until an admin verifies it under **Admin → Wallet**.
 3. Withdrawals reserve the requested balance immediately. Admins approve the
