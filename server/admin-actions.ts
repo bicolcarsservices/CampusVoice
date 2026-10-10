@@ -2,14 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { parsePhpAmount, parsePhpDeduction } from "@/lib/wallet";
 
 const uuid = z.string().uuid();
 
 async function getAdminClient() {
-  const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { supabase, user, error: authError } = await getAuthUser(createClient());
   if (authError || !user) return { supabase, error: "Please log in with an administrator account." };
   const { data: isAdmin, error } = await supabase.rpc("is_admin");
   if (error) return { supabase, error: `Could not verify admin access: ${error.message}` };
@@ -286,7 +285,7 @@ export async function saveWebsiteSetting(formData: FormData) {
     value = parsed.data;
   }
   const { error } = await supabase.from("website_settings").upsert({
-    key: key.data, value, updated_by: (await supabase.auth.getUser()).data.user?.id,
+    key: key.data, value, updated_by: (await getAuthUser(supabase)).user?.id,
   });
   if (error) return { error: `Could not save setting: ${error.message}` };
   revalidatePath("/admin/settings");
@@ -372,7 +371,7 @@ export async function saveAnnouncement(formData: FormData) {
     ? await supabase.from("announcements").update({ title: title.data, body: body.data, is_published: published }).eq("id", id.data)
     : await supabase.from("announcements").insert({
         title: title.data, body: body.data, is_published: published,
-        created_by: (await supabase.auth.getUser()).data.user?.id,
+        created_by: (await getAuthUser(supabase)).user?.id,
       });
   if (mutation.error) return { error: `Could not save announcement: ${mutation.error.message}` };
   revalidatePath("/admin/announcements");

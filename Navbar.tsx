@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { logout } from "@/server/auth-actions";
 
 export default async function Navbar() {
-  const { data: { user } } = await createClient().auth.getUser();
+  const { user } = await getAuthUser(createClient());
   return (
     <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
       <nav className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">

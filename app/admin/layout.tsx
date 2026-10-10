@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { supabase, user, error: authError } = await getAuthUser(createClient());
   if (authError || !user) redirect("/login");
   const { data: allowed, error } = await supabase.rpc("is_admin");
   if (error) throw new Error(`Could not verify administrator access: ${error.message}`);

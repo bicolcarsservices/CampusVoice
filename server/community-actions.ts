@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { resolveSchoolName } from "@/lib/schools";
 import { parsePhpAmount } from "@/lib/wallet";
 
@@ -25,8 +25,7 @@ const reasons = [
 export type ActionState = { error?: string; success?: string } | null;
 
 async function getActiveUser() {
-  const supabase = createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { supabase, user, error } = await getAuthUser(createClient());
   if (error) return { supabase, user: null, error: "Please log in and try again." };
   if (!user) return { supabase, user: null, error: "Please log in to continue." };
 

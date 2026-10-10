@@ -1,4 +1,4 @@
-import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
+import { createClient, getAuthUser, hasSupabaseConfig } from "@/lib/supabase/server";
 import Link from "next/link";
 import PostCard from "@/components/community/PostCard";
 
@@ -42,11 +42,11 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
   if (categoryId) postsQuery = postsQuery.eq("category_id", categoryId);
 
   const [{ data: posts, error: postsError }, { data: schools, error: schoolsError },
-    { data: categories, error: categoriesError }, { data: { user } }] = await Promise.all([
+    { data: categories, error: categoriesError }, { user }] = await Promise.all([
     postsQuery,
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
     supabase.from("categories").select("id,name").eq("is_active", true).order("sort_order"),
-    supabase.auth.getUser(),
+    getAuthUser(supabase),
   ]);
   if (postsError) throw new Error(`Could not load Freedom Wall posts: ${postsError.message}`);
   if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);

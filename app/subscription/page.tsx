@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import PlanRequestForm from "@/components/community/PlanRequestForm";
 import PlanTrialForm, { TrialStatus } from "@/components/community/PlanTrialForm";
 import CancelSubscriptionForm from "@/components/community/CancelSubscriptionForm";
@@ -14,12 +14,12 @@ export default async function SubscriptionPage({
 }) {
   const supabase = createClient();
   const [{ data: plans, error: plansError }, { data: features, error: featuresError },
-    { data: { user } }, { data: subscription, error: subscriptionError }] = await Promise.all([
+    { user }, { data: subscription, error: subscriptionError }] = await Promise.all([
     supabase.from("subscription_plans")
       .select("id,code,name,description,price_php,duration_days,daily_post_limit,badge_label,is_active,sort_order")
       .eq("is_active", true).order("sort_order"),
     supabase.from("subscription_features").select("plan_id,label,feature_key,sort_order").order("sort_order"),
-    supabase.auth.getUser(),
+    getAuthUser(supabase),
     supabase.rpc("my_subscription"),
   ]);
   if (plansError) throw new Error(`Could not load subscription plans: ${plansError.message}`);

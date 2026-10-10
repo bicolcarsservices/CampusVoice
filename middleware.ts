@@ -36,7 +36,19 @@ export async function middleware(req: NextRequest) {
       },
     }
   );
-  const { data: { user } } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error || error.name === "AuthSessionMissingError" || error.message?.toLowerCase().includes("auth session missing")) {
+      user = data.user;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    const name = error instanceof Error ? error.name : "";
+    if (name !== "AuthSessionMissingError" && !message.includes("auth session missing")) {
+      throw error;
+    }
+  }
   if (!user && PROTECTED.some((p) => req.nextUrl.pathname.startsWith(p))) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";

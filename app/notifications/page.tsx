@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 import MarkNotificationRead from "@/components/community/MarkNotificationRead";
 
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { supabase, user, error: authError } = await getAuthUser(createClient());
   if (authError || !user) redirect("/login");
   const { data: notifications, error } = await supabase.from("notifications")
     .select("id,type,message,link,is_read,created_at")

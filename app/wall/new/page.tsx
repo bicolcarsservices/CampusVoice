@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import PostComposer from "@/components/community/PostComposer";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewPostPage() {
-  const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { supabase, user, error: authError } = await getAuthUser(createClient());
   if (authError || !user) redirect("/login");
 
   const [{ data: categories, error: categoriesError }, { data: schools, error: schoolsError }] = await Promise.all([
