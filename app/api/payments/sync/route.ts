@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 const requestSchema = z.object({ intentId: z.string().trim().min(1).max(100) });
 const API = "https://api.paymongo.com/v1";
 
 export async function POST(request: Request) {
   const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { user, error: authError } = await getAuthUser(supabase);
   if (authError) {
     console.error("PayMongo status sync authentication failed", authError);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });

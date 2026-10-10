@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
+import { createClient, getAuthUser, hasSupabaseConfig } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export default async function GamesPage() {
 
   if (hasSupabaseConfig()) {
     const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { user, error: authError } = await getAuthUser(supabase);
     if (authError) throw new Error(`Could not verify login for games: ${authError.message}`);
     signedIn = Boolean(user);
 

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function CampusCoinRushPage() {
-  const { data: { user }, error } = await createClient().auth.getUser();
+  const { user, error } = await getAuthUser(createClient());
   if (error) throw new Error(`Could not verify your login: ${error.message}`);
   if (!user) redirect("/login?next=%2Fgames%2Fcampus-coin-rush");
 

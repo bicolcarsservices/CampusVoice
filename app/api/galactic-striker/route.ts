@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("convert"), crystals: z.union([z.literal(25000), z.literal(60000)]) }),
@@ -29,15 +29,18 @@ const requestSchema = z.discriminatedUnion("action", [
 
 export async function GET(request: Request) {
   const supabase = createClient();
-  const [{ data: { user }, error: authError }, { data: subscription, error: subscriptionError }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.rpc("my_subscription"),
-  ]);
-  if (authError || subscriptionError) {
-    console.error("Could not load Galactic Striker access", authError ?? subscriptionError);
+  const { user, error: authError } = await getAuthUser(supabase);
+  if (authError) {
+    console.error("Could not load Galactic Striker access", authError);
     return NextResponse.json({ error: "Could not verify your account or subscription." }, { status: 500 });
   }
   if (!user) return NextResponse.json({ error: "Log in to use Galactic Striker." }, { status: 401 });
+
+  const { data: subscription, error: subscriptionError } = await supabase.rpc("my_subscription");
+  if (subscriptionError) {
+    console.error("Could not load Galactic Striker access", subscriptionError);
+    return NextResponse.json({ error: "Could not verify your account or subscription." }, { status: 500 });
+  }
   const gameAccessAvailable = ["basic", "premium"].includes(subscription?.status);
   if (new URL(request.url).searchParams.get("mode") === "game" && !gameAccessAvailable) {
     return NextResponse.json({ error: "An active Basic or Premium plan is required to play Galactic Striker." }, { status: 403 });
@@ -81,7 +84,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { user, error: authError } = await getAuthUser(supabase);
   if (authError) {
     console.error("Galactic Striker request authentication failed", authError);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });

@@ -1,18 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import GalacticStriker from "@/components/games/GalacticStriker";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function GalacticStrikerPage() {
   const supabase = createClient();
-  const [{ data: { user }, error: authError }, { data: subscription, error: subscriptionError }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.rpc("my_subscription"),
-  ]);
+  const { user, error: authError } = await getAuthUser(supabase);
   if (authError) throw new Error(`Could not verify your login: ${authError.message}`);
   if (!user) redirect("/login?next=%2Fgames%2Fgalactic-striker");
+  const { data: subscription, error: subscriptionError } = await supabase.rpc("my_subscription");
   if (subscriptionError) throw new Error(`Could not verify your subscription: ${subscriptionError.message}`);
 
   const gameEnabled = ["basic", "premium"].includes(subscription?.status);

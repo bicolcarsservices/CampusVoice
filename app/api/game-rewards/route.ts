@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 const requestSchema = z.object({
   rewardId: z.enum(["load10", "gosurf59"]),
@@ -11,7 +11,7 @@ const requestSchema = z.object({
 
 export async function GET() {
   const supabase = createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { user, error } = await getAuthUser(supabase);
   if (error) {
     console.error("Campus Coin Rush reward history authentication failed", error);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });
@@ -32,7 +32,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const supabase = createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
+  const { user, error } = await getAuthUser(supabase);
   if (error) {
     console.error("Campus Coin Rush reward claim authentication failed", error);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });
