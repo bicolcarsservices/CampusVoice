@@ -1,4 +1,5 @@
 import AdminActionForm from "@/components/admin/AdminActionForm";
+import WalletTopupFeeField from "@/components/admin/WalletTopupFeeField";
 import { formatCentavos } from "@/lib/wallet";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -15,7 +16,7 @@ export default async function AdminWalletPage() {
     { data: withdrawals, error: withdrawalError },
     { data: rates, error: ratesError }] = await Promise.all([
     supabase.from("wallet_topup_requests")
-      .select("id,user_id,amount_centavos,payment_reference,status,created_at,profiles(username,display_name)")
+      .select("id,user_id,amount_centavos,received_centavos,fee_centavos,credited_centavos,payment_reference,status,created_at,profiles(username,display_name)")
       .order("created_at", { ascending: false }).limit(100),
     supabase.from("wallet_withdrawal_requests")
       .select("id,user_id,amount_centavos,payout_method,account_name,account_number,status,created_at,profiles(username,display_name)")
@@ -40,9 +41,14 @@ export default async function AdminWalletPage() {
           return (
             <article className="card space-y-3" key={request.id}>
               <div className="flex flex-wrap justify-between gap-2">
-                <h4 className="font-bold">{profile?.display_name ?? profile?.username ?? request.user_id} · {formatCentavos(request.amount_centavos)}</h4>
+                <h4 className="font-bold">{profile?.display_name ?? profile?.username ?? request.user_id} · {formatCentavos(request.amount_centavos)} sent</h4>
                 <span className="tag capitalize">{request.status}</span>
               </div>
+              {request.status !== "pending" && request.status !== "rejected" && (
+                <p className="text-sm text-slate-500">
+                  Received: {formatCentavos(request.received_centavos)} · Deduction: {formatCentavos(request.fee_centavos)} · Credited to wallet: <strong>{formatCentavos(request.credited_centavos)}</strong>
+                </p>
+              )}
               <p className="text-sm text-slate-500">{new Date(request.created_at).toLocaleString()}{request.payment_reference ? ` · Maya reference: ${request.payment_reference}` : ""}</p>
               {request.status === "pending" && (
                 <div className="grid gap-3 md:grid-cols-2">
@@ -50,8 +56,9 @@ export default async function AdminWalletPage() {
                     <AdminActionForm key={decision} action={adminReviewWalletTopup} submitLabel={decision === "approve" ? "Verify payment and credit" : "Reject request"}>
                       <input type="hidden" name="request_id" value={request.id} />
                       <input type="hidden" name="decision" value={decision} />
+                      {decision === "approve" && <WalletTopupFeeField requestedCentavos={request.amount_centavos} />}
                       <label className="block text-sm">Review note
-                        <input name="reason" maxLength={500} className="input mt-1" placeholder={decision === "approve" ? "Verified Maya transaction" : "Reason for rejection"} />
+                        <input name="reason" maxLength={500} className="input mt-1" placeholder={decision === "approve" ? "Verified Maya transaction and deduction basis" : "Reason for rejection"} />
                       </label>
                     </AdminActionForm>
                   ))}

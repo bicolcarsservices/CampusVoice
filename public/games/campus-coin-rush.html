@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Campus Coin Rush — CampusVoice</title>
+<style>
+:root{--bg:#070b1f;--card:#131a3a;--line:#2a3566;--txt:#e8ecff;--mut:#9aa6d6;--coin:#fbbf24;--dia:#38bdf8;--ok:#22c55e;--warn:#f59e0b}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#1b2566,var(--bg));background-attachment:fixed;color:var(--txt);line-height:1.4}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;background:#0a1030cc;border-bottom:1px solid var(--line)}
+h1{font-size:1.2rem;margin:0;background:linear-gradient(90deg,#fde047,#f472b6,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:.2rem 0 .6rem}h3{margin:.1rem 0 .3rem}
+.badge{font-size:.65rem;background:var(--warn);color:#000;padding:2px 6px;border-radius:6px;vertical-align:middle;margin-left:6px;-webkit-text-fill-color:#000}
+.balances{display:flex;gap:8px}
+.bal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:.85rem}
+.bal b{font-size:1.05rem;margin-left:4px}.bal.coins b{color:var(--coin)}.bal.dias b{color:var(--dia)}
+.bal small{display:block;font-size:.6rem;color:var(--mut)}
+nav{display:flex;gap:4px;padding:8px 10px;background:#0a1030ee;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav button{flex:1;min-width:max-content;background:transparent;color:var(--mut);border:1px solid transparent;padding:9px 12px;border-radius:10px;font-size:.9rem;cursor:pointer}
+nav button.active{background:linear-gradient(135deg,#2b3a9a,#5b2a9a);color:#fff}
+main{max-width:980px;margin:0 auto;padding:12px}
+.banner{background:#3a1d05;border:1px solid var(--warn);color:#fde68a;border-radius:10px;padding:8px 10px;font-size:.8rem;margin-bottom:12px}
+.notice{background:#142459;border:1px solid #3b82f6;color:#c7d8ff;border-radius:10px;padding:8px 10px;font-size:.82rem;margin:10px 0}
+.game-layout{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.stage{flex:1 1 340px;max-width:420px;margin:0 auto}.side{flex:1 1 280px;min-width:260px}
+.cwrap{position:relative;border:2px solid #4b5bd0;border-radius:16px;overflow:hidden;background:#000;box-shadow:0 0 28px #4b5bd055}
+canvas{display:block;width:100%;height:auto;touch-action:none}
+.overlay{position:absolute;inset:0;background:rgba(5,8,28,.93);padding:14px;overflow:auto;display:flex;flex-direction:column;gap:8px;font-size:.85rem}
+.overlay h3{font-size:1.15rem}.overlay ul,.rules{margin:0;padding-left:18px;font-size:.82rem}
+.overlay li,.rules li{margin-bottom:4px}
+.overlay .row{position:sticky;bottom:0;background:#050820;padding:8px 0;margin-top:auto}
+#ackBox{width:22px;height:22px;vertical-align:middle}
+.hud{display:flex;justify-content:space-between;gap:6px;font-size:.82rem;margin-bottom:6px;flex-wrap:wrap}
+.hud span{background:var(--card);border:1px solid var(--line);padding:3px 8px;border-radius:8px}
+.dpad{display:grid;grid-template-columns:repeat(3,56px);grid-template-rows:repeat(2,56px);gap:6px;justify-content:center;margin:10px 0}
+.dpad button{background:var(--card);border:1px solid var(--line);color:var(--txt);border-radius:14px;font-size:1.3rem;touch-action:none;user-select:none}
+.dpad .up{grid-column:2;grid-row:1}.dpad .left{grid-column:1;grid-row:2}.dpad .down{grid-column:2;grid-row:2}.dpad .right{grid-column:3;grid-row:2}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--txt);padding:9px 14px;border-radius:10px;font-size:.9rem;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-color:transparent;color:#fff}
+.btn.ghost{background:transparent}.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.card.eq{border-color:#a78bfa;box-shadow:0 0 16px #a78bfa55}
+.card .btn{margin-top:auto}.card canvas{width:96px;height:96px;margin:0 auto;background:radial-gradient(#1b2566,#0a1030);border-radius:50%}
+.big{font-size:1.3rem;font-weight:700}.big.dias{color:var(--dia)}.big.coin{color:var(--coin)}
+.mut{color:var(--mut);font-size:.82rem;margin:0}.price{font-size:.85rem;color:#fde68a}
+.bar{height:8px;background:#0a1030;border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--coin)}
+.mission{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;padding:5px 0;border-bottom:1px dashed var(--line)}
+.mission.done{color:var(--ok)}
+.hist{display:flex;flex-direction:column;gap:8px}
+.item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.item .top{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:.88rem}
+.item .sub{display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:.75rem;flex-wrap:wrap}
+.tag{font-size:.65rem;border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-right:6px;color:var(--mut)}
+select{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:14px;z-index:20}
+.dialog{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;max-width:420px;width:100%;max-height:90vh;overflow:auto}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dashed var(--line);font-size:.88rem}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#020617;border:1px solid var(--line);padding:9px 14px;border-radius:10px;font-size:.85rem;z-index:30;max-width:92vw;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Campus Coin Rush <span class="badge">CAMPUSVOICE</span></h1>
+  <div class="balances">
+    <div class="bal coins">🪙 Coins<b id="coinBal">0</b><small>game points</small></div>
+    <div class="bal dias">💎 Dias<b id="diasBal">0</b><small>account balance</small></div>
+    <div class="bal">💳 Wallet<b id="walletBal">₱0.00</b><small>CampusVoice balance</small></div>
+  </div>
+</header>
+<nav id="tabs">
+  <button class="active" data-tab="game">🎮 Game</button>
+  <button data-tab="shop">💎 Dias Shop</button>
+  <button data-tab="rewards">🎁 Rewards</button>
+  <button data-tab="history">🧾 Transaction History</button>
+</nav>
+<main>
+  <div class="banner" id="storageBanner">Dias purchases are charged securely to your CampusVoice wallet. Game Coins and play progress are saved in this browser and can be edited; load claims are not automatically verified or sent and require manual admin review.</div>
+
+  <section id="tab-game">
+    <div class="game-layout">
+      <div class="stage">
+        <div class="hud">
+          <span>⏱ <b id="hTime">60</b>s</span>
+          <span>⭐ <b id="hScore">0</b></span>
+          <span>🪙 +<b id="hColl">0</b></span>
+          <span>🔥 x<b id="hCombo">1</b></span>
+          <span id="hFast" hidden style="border-color:#fde047;color:#fde047">⚡ SPEED</span>
+          <span>🎟 <b id="hPlays">10</b>/10</span>
+        </div>
+        <div class="cwrap">
+          <canvas id="cv" width="360" height="480"></canvas>
+          <div class="overlay" id="overlay">
+            <h3 id="ovTitle"></h3>
+            <p id="ovMsg" style="margin:0"></p>
+            <ul id="ovRules"></ul>
+            <label id="ovAckRow"><input type="checkbox" id="ackBox"> I understand these rules.</label>
+            <div class="row"><button class="btn primary" id="ovBtn"></button></div>
+          </div>
+        </div>
+        <div class="dpad" id="dpad">
+          <button class="up" data-dir="up" aria-label="Up">▲</button>
+          <button class="left" data-dir="left" aria-label="Left">◀</button>
+          <button class="down" data-dir="down" aria-label="Down">▼</button>
+          <button class="right" data-dir="right" aria-label="Right">▶</button>
+        </div>
+        <p class="mut" style="text-align:center">Move: Arrow keys / WASD, the on-screen pad, or drag on the game area.</p>
+      </div>
+      <div class="side">
+        <div class="panel">
+          <h3>Controls</h3>
+          <div class="row" style="margin-top:0">
+            <button class="btn" id="pauseBtn">⏸ Pause</button>
+            <button class="btn" id="restartBtn">↻ Restart (uses 1 play)</button>
+          </div>
+          <p class="mut" style="margin-top:8px">Restarting is not a death (no Coins deducted), but it starts a new run and uses 1 of your 10 daily plays.</p>
+          <p class="mut" style="margin-top:6px">Character: <b id="curSkin">Blue Orb</b> — change it in the Dias Shop.</p>
+        </div>
+        <div class="panel">
+          <h3>Missions (this run)</h3>
+          <div id="missions"></div>
+          <p class="mut" style="margin-top:6px">Best score: <b id="bestScore">0</b></p>
+        </div>
+        <div class="panel">
+          <h3>Rules</h3>
+          <ul class="rules" id="sideRules"></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-shop" hidden>
+    <h2>Dias Shop</h2>
+    <div class="notice">Dias package purchases deduct the listed price from your CampusVoice wallet. Wallet top-ups sent through Maya are credited after admin verification. No extra game VAT or fee is added. Dias cannot be converted to Coins and are never lost when you die. Characters are cosmetic only.</div>
+    <p class="mut">Need wallet funds? <a href="/wallet" target="_top" style="color:#c7d8ff;text-decoration:underline">Top up your CampusVoice wallet</a>.</p>
+    <div class="panel" id="shopReceipt" hidden></div>
+    <h3>Dias Packages</h3>
+    <div class="grid" id="pkgGrid"></div>
+    <h3 style="margin-top:18px">Characters (paid with Dias)</h3>
+    <div class="grid" id="featGrid"></div>
+  </section>
+
+  <section id="tab-rewards" hidden>
+    <h2>Load rewards</h2>
+    <div class="notice">Coins are game points, not cash, and cannot be withdrawn. Submit a claim with the recipient's name, email, and cellphone number. Claims are reviewed and load is sent manually by an admin around 9 PM; submitting a claim does not guarantee fulfillment. Coins are stored in this browser and are not server-verified.</div>
+    <div class="grid" id="rewardGrid"></div>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="margin-top:18px">Your reward claims</h3>
+      <button class="btn" id="refreshClaimsBtn" type="button">Refresh claim status</button>
+    </div>
+    <div class="hist" id="redeemList"></div>
+  </section>
+
+  <section id="tab-history" hidden>
+    <h2>Game History</h2>
+    <div class="row" style="margin:0 0 10px">
+      <select id="histFilter">
+        <option value="ALL">All entries</option>
+        <option value="TOPUP">Dias package purchases</option>
+        <option value="FEATURE">Character purchases</option>
+        <option value="REDEEM">Load reward claims</option>
+        <option value="DEATH">Death deductions</option>
+        <option value="MISSION">Mission rewards</option>
+      </select>
+    </div>
+    <div class="hist" id="histList"></div>
+  </section>
+</main>
+<footer>CampusVoice wallet purchases and reward claim requests are recorded on the server. Coins and play progress remain local to this browser.</footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h3 id="mTitle"></h3><div id="mBody"></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mOk"></button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+(() => {
+'use strict';
+const KEY='campusCoinRushStandaloneDemo_v2';
+const W=360,H=480,RUN_SECONDS=60,SPEED=230,DEATH_COST=25,DAILY_PLAYS=10,FAST_AT=1000,FAST_MUL=1.35;
+const PACKAGES=[
+ {id:'p1',name:'Starter Pack',dias:50,price:49,desc:'A small bundle to unlock a character.'},
+ {id:'p2',name:'Student Pack',dias:120,price:99,desc:'Enough for a mid-tier character.'},
+ {id:'p3',name:'Campus Pack',dias:300,price:199,desc:'Unlock several characters.'},
+ {id:'p4',name:'Mega Pack',dias:700,price:399,desc:'Largest bundle. Best value per Dia.'}];
+const SKINS=[
+ {id:'orb',name:'Blue Orb',cost:0,shape:'circle',c1:'#7dd3fc',c2:'#2563eb',trail:'#38bdf8',desc:'The default character. Free.'},
+ {id:'star',name:'Gold Star',cost:30,shape:'star',c1:'#fde047',c2:'#f59e0b',trail:'#fbbf24',glow:1,desc:'A spinning star with a golden glow.'},
+ {id:'rocket',name:'Neon Rocket',cost:45,shape:'tri',c1:'#f0abfc',c2:'#06b6d4',trail:'#e879f9',glow:1,noSpin:1,desc:'Sleek neon arrow with a bright trail.'},
+ {id:'gem',name:'Crystal Gem',cost:60,shape:'diamond',c1:'#a5f3fc',c2:'#8b5cf6',trail:'#67e8f9',glow:1,sparkle:1,desc:'Sparkling crystal that throws glitter.'},
+ {id:'flame',name:'Flame Hex',cost:80,shape:'hex',c1:'#fef08a',c2:'#ef4444',trail:'#fb923c',glow:1,aura:1,desc:'Fiery hexagon with a burning aura.'},
+ {id:'galaxy',name:'Galaxy Nova',cost:120,shape:'star8',c1:'#ffffff',c2:'#a855f7',trail:'rainbow',glow:1,aura:1,sparkle:1,desc:'Legendary: rainbow trail, aura and sparkles.'}];
+const REWARDS=[
+ {id:'load10',coins:25000,peso:10,label:'₱10 Mobile Load Reward'},
+ {id:'gosurf59',coins:60000,peso:59,label:'₱59 GoSURF Reward'}];
+const MISSIONS=[
+ {id:'m1',text:'Collect 15 Coins in one run',reward:50,check:r=>r.collected>=15},
+ {id:'m2',text:'Score 250 points',reward:100,check:r=>r.score>=250},
+ {id:'m3',text:'Survive the full 60 seconds',reward:150,check:r=>r.survived}];
+const RULES=[
+ 'Coins and Dias are separate currencies. They are never interchangeable.',
+ 'If you die, '+DEATH_COST+' Coins are deducted. If you have fewer than '+DEATH_COST+', only what you have is deducted. Your balance never goes below 0, and with 0 Coins nothing is deducted.',
+ 'Dias are never deducted when you die.',
+ 'SPEED MODE: once your Coin balance reaches '+FAST_AT.toLocaleString('en-US')+' or more, the game runs faster (obstacles fall and spawn faster, and your character moves faster) for that run. Starting a run with '+FAST_AT.toLocaleString('en-US')+'+ Coins also starts in Speed Mode.',
+ 'You can play '+DAILY_PLAYS+' runs per day (resets at your local midnight). Restarting counts as a new run.',
+ 'The game is free to play with 0 Coins and 0 Dias. There is no paid entry, no gambling, and no cash withdrawal.',
+ 'Coins are browser-saved game points and can be edited. Claims for ₱10 mobile load (25,000 Coins) or ₱59 GoSURF load (60,000 Coins) are manually reviewed by an admin and are not sent automatically.',
+ 'Dias and character purchases are stored server-side. Dias packages are charged to your CampusVoice wallet at the listed price, with no extra in-game fee or VAT.'];
+
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n).toLocaleString('en-US');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+let toastTimer;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3400)}
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
+
+let storageOK=true;
+const DEFAULT=()=>({coins:0,dias:0,owned:['orb'],skin:'orb',best:0,plays:{d:today(),n:0},history:[]});
+function load(){
+ try{
+  const raw=localStorage.getItem(KEY);if(!raw)return DEFAULT();
+  const o=JSON.parse(raw)||{};const n=v=>(Number.isFinite(v)&&v>0)?Math.floor(v):0;
+  const s=DEFAULT();s.coins=n(o.coins);s.dias=n(o.dias);s.best=n(o.best);
+  const ids=SKINS.map(k=>k.id);
+  s.owned=Array.isArray(o.owned)?[...new Set(['orb',...o.owned.filter(i=>ids.includes(i))])]:['orb'];
+  s.skin=s.owned.includes(o.skin)?o.skin:'orb';
+  if(o.plays&&typeof o.plays.d==='string')s.plays={d:o.plays.d.slice(0,12),n:Math.min(n(o.plays.n),DAILY_PLAYS)};
+  s.history=Array.isArray(o.history)?o.history.slice(0,200).filter(h=>h&&typeof h==='object').map(h=>({id:String(h.id||'').slice(0,40),ts:n(h.ts),type:String(h.type||'').slice(0,12),desc:String(h.desc||'').slice(0,160),delta:String(h.delta||'').slice(0,40),status:String(h.status||'').slice(0,80)})):[];
+  return s;
+ }catch(e){storageOK=false;return DEFAULT()}
+}
+let state=load(),dirty=false,lastSave=0;
+let gameAccountReady=false;
+let gameAccount={dias:0,ownedSkins:['orb'],equippedSkin:'orb',walletBalanceCentavos:0};
+let rewardClaims=[];
+function save(){dirty=false;try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){storageOK=false}}
+function log(type,desc,delta,status){state.history.unshift({id:uid(),ts:Date.now(),type,desc,delta,status});if(state.history.length>200)state.history.length=200}
+function playsLeft(){if(state.plays.d!==today())state.plays={d:today(),n:0};return Math.max(0,DAILY_PLAYS-state.plays.n)}
+const skinOf=id=>SKINS.find(s=>s.id===id)||SKINS[0];
+
+/* ---- character drawing ---- */
+function poly(c,pts){c.beginPath();pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1]));c.closePath()}
+function star(n,r,k){const p=[];for(let i=0;i<n*2;i++){const a=-Math.PI/2+i*Math.PI/n,q=i%2?r*k:r;p.push([Math.cos(a)*q,Math.sin(a)*q])}return p}
+function shapePath(c,s,r){
+ if(s.shape==='circle'){c.beginPath();c.arc(0,0,r,0,7)}
+ else if(s.shape==='star')poly(c,star(5,r*1.15,.45));
+ else if(s.shape==='star8')poly(c,star(8,r*1.2,.55));
+ else if(s.shape==='tri')poly(c,[[0,-r*1.2],[r*.95,r*.95],[0,r*.45],[-r*.95,r*.95]]);
+ else if(s.shape==='diamond')poly(c,[[0,-r*1.2],[r*.85,0],[0,r*1.2],[-r*.85,0]]);
+ else{const p=[];for(let i=0;i<6;i++){const a=i*Math.PI/3;p.push([Math.cos(a)*r,Math.sin(a)*r])}poly(c,p)}
+}
+function trailColor(s,t){return s.trail==='rainbow'?'hsl('+((t*220)%360)+',100%,65%)':s.trail}
+function drawChar(c,x,y,r,s,t){
+ c.save();c.translate(x,y);
+ if(s.aura){const p=1+Math.sin(t*5)*.12,g=c.createRadialGradient(0,0,r*.4,0,0,r*2.2*p);g.addColorStop(0,s.c2+'88');g.addColorStop(1,s.c2+'00');c.fillStyle=g;c.beginPath();c.arc(0,0,r*2.2*p,0,7);c.fill()}
+ if(!s.noSpin&&s.shape!=='circle')c.rotate(t*1.4);
+ if(s.glow){c.shadowColor=s.c2;c.shadowBlur=18}
+ const g=c.createLinearGradient(-r,-r,r,r);g.addColorStop(0,s.c1);g.addColorStop(1,s.c2);
+ c.fillStyle=g;shapePath(c,s,r);c.fill();
+ c.shadowBlur=0;c.strokeStyle='rgba(255,255,255,.75)';c.lineWidth=1.5;c.stroke();
+ c.fillStyle='rgba(255,255,255,.35)';c.beginPath();c.arc(-r*.3,-r*.35,r*.22,0,7);c.fill();
+ c.restore();
+}
+
+/* ---- modal ---- */
+let modalOpen=false;
+function closeModal(){$('modal').hidden=true;modalOpen=false;$('mOk').hidden=false;$('mCancel').textContent='Cancel'}
+function confirmDialog({title,rows,note,okText,onOk}){
+ if(modalOpen)return;modalOpen=true;
+ $('mTitle').textContent=title;const b=$('mBody');b.replaceChildren();
+ rows.forEach(([k,v])=>{const r=el('div','kv');r.append(el('span','',k),el('b','',v));b.append(r)});
+ if(note)b.append(el('div','notice',note));
+ let used=false;const ok=$('mOk');ok.textContent=okText;ok.disabled=false;
+ ok.onclick=()=>{if(used)return;used=true;ok.disabled=true;closeModal();onOk()};
+ $('mCancel').onclick=closeModal;$('modal').hidden=false;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modalOpen)closeModal()});
+
+/* ---- rendering ---- */
+const previews=[];
+function renderBalances(){
+ $('coinBal').textContent=fmt(state.coins);$('diasBal').textContent=fmt(state.dias);
+ $('walletBal').textContent='₱'+(gameAccount.walletBalanceCentavos/100).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+ $('bestScore').textContent=fmt(state.best);$('hPlays').textContent=playsLeft();
+ $('curSkin').textContent=skinOf(state.skin).name;
+}
+function renderMissions(){
+ const box=$('missions');box.replaceChildren();
+ MISSIONS.forEach(m=>{const done=run&&run.done[m.id];const d=el('div','mission'+(done?' done':''));d.append(el('span','',(done?'✓ ':'○ ')+m.text),el('span','','+'+m.reward+' 🪙'));box.append(d)});
+}
+function renderShop(){
+ const pk=$('pkgGrid');pk.replaceChildren();
+ PACKAGES.forEach(p=>{const c=el('div','card');
+  c.append(el('h3','',p.name),el('div','big dias','💎 '+fmt(p.dias)+' Dias'),el('p','mut',p.desc),el('div','price','₱'+p.price+' from CampusVoice wallet'));
+  const b=el('button','btn primary',gameAccountReady?'Buy with wallet':'Loading wallet…');
+  b.disabled=!gameAccountReady||gameAccount.walletBalanceCentavos<p.price*100;
+  b.onclick=()=>buyPackage(p);c.append(b);pk.append(c)});
+ const fg=$('featGrid');fg.replaceChildren();previews.length=0;
+ SKINS.forEach(s=>{
+  const owned=state.owned.includes(s.id),eq=state.skin===s.id;
+  const c=el('div','card'+(eq?' eq':''));
+  const cvp=document.createElement('canvas');cvp.width=96;cvp.height=96;previews.push({cv:cvp,s});
+  c.append(cvp,el('h3','',s.name),el('div','big dias',s.cost?'💎 '+s.cost+' Dias':'Free'),el('p','mut',s.desc));
+  let label,dis=false,fn;
+  if(eq){label='✓ Equipped';dis=true}
+  else if(owned){label='Equip';fn=()=>equipSkin(s)}
+  else if(state.dias<s.cost){label='Not enough Dias';dis=true}
+  else{label='Buy with Dias';fn=()=>buySkin(s)}
+  const b=el('button','btn primary',label);b.disabled=dis||!gameAccountReady;if(fn)b.onclick=fn;c.append(b);fg.append(c)});
+}
+function renderRewards(){
+ const g=$('rewardGrid');g.replaceChildren();
+ REWARDS.forEach(r=>{const c=el('div','card');
+  c.append(el('h3','',r.label),el('div','big coin','🪙 '+fmt(r.coins)+' Coins'),el('p','mut','Load sent manually after admin review.'));
+  const bar=el('div','bar'),i=el('i');i.style.width=Math.min(100,state.coins/r.coins*100)+'%';bar.append(i);c.append(bar);
+  const need=Math.max(0,r.coins-state.coins);
+  c.append(el('p','mut',need>0?'You need '+fmt(need)+' more Coins.':'You have enough Coins to submit a claim.'));
+  const b=el('button','btn primary',need>0?'Not enough Coins':'Claim reward');b.disabled=need>0;b.onclick=()=>redeem(r);c.append(b);g.append(c)});
+ const rl=$('redeemList');rl.replaceChildren();
+ if(!rewardClaims.length)rl.append(el('p','mut','No reward claims yet.'));
+ rewardClaims.forEach(claim=>{
+  const item=el('div','item');
+  item.append(el('div','top',claim.reward_code==='gosurf59'?'₱59 GoSURF load':'₱10 mobile load'));
+  item.append(el('div','sub',claim.status+' · '+new Date(claim.created_at).toLocaleString()));
+  if(claim.review_note)item.append(el('p','mut','Admin note: '+claim.review_note));
+  rl.append(item);
+ });
+}
+function histItem(h){
+ const d=el('div','item'),top=el('div','top');top.append(el('span','',h.desc),el('span','',h.delta));
+ const sub=el('div','sub'),left=el('span');left.append(el('span','tag',h.type),document.createTextNode(h.ts?new Date(h.ts).toLocaleString():''));
+ sub.append(left,el('span','',h.status));d.append(top,sub);return d;
+}
+function renderHistory(){
+ const f=$('histFilter').value,l=$('histList');l.replaceChildren();
+ const items=state.history.filter(h=>f==='ALL'||h.type===f);
+ if(!items.length)l.append(el('p','mut','No game transactions yet.'));
+ items.forEach(h=>l.append(histItem(h)));
+}
+function renderAll(){renderBalances();renderShop();renderRewards();renderHistory();renderMissions()}
+$('histFilter').onchange=renderHistory;
+$('refreshClaimsBtn').onclick=refreshRewardClaims;
+
+/* ---- shop / rewards ---- */
+async function postJson(url,payload){
+ const response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+ const body=await response.json();
+ if(!response.ok)throw new Error(body.error||'Request failed. Please try again.');
+ return body;
+}
+function applyGameAccount(account){
+ gameAccount={
+  dias:Number(account.dias),ownedSkins:account.ownedSkins,
+  equippedSkin:account.equippedSkin,walletBalanceCentavos:Number(account.walletBalanceCentavos)
+ };
+ state.dias=gameAccount.dias;state.owned=gameAccount.ownedSkins;state.skin=gameAccount.equippedSkin;
+ gameAccountReady=true;save();renderAll();
+}
+async function refreshGameAccount(){
+ try{
+  const response=await fetch('/api/game-account',{cache:'no-store'});
+  const body=await response.json();
+  if(!response.ok)throw new Error(body.error||'Could not load CampusVoice wallet.');
+  applyGameAccount(body);
+ }catch(error){
+  gameAccountReady=false;
+  $('shopReceipt').hidden=false;
+  $('shopReceipt').textContent=error instanceof Error?error.message:'Could not load CampusVoice wallet.';
+  renderAll();
+ }
+}
+async function refreshRewardClaims(){
+ try{
+  const response=await fetch('/api/game-rewards',{cache:'no-store'});
+  const body=await response.json();
+  if(response.ok){rewardClaims=body.claims||[];renderRewards()}
+ }catch(error){console.error('Could not refresh game reward claims',error)}
+}
+function buyPackage(p){
+ if(!gameAccountReady){toast('CampusVoice wallet is not available. Refresh the page and try again.');return}
+ confirmDialog({title:'Confirm Dias purchase',
+  rows:[['Package',p.name],['You receive',fmt(p.dias)+' Dias'],['Wallet price','₱'+p.price],['Wallet after purchase','₱'+((gameAccount.walletBalanceCentavos-p.price*100)/100).toFixed(2)]],
+  note:'This purchase deducts the listed amount from your CampusVoice wallet. No extra in-game fee or VAT is charged.',
+  okText:'Buy with CampusVoice wallet',
+  onOk:async()=>{
+   try{
+    const result=await postJson('/api/game-account',{action:'buyDias',packageId:p.id});
+    applyGameAccount(result);
+    log('TOPUP',p.name+' ('+fmt(p.dias)+' Dias)','+'+fmt(p.dias)+' Dias','Paid from CampusVoice wallet');
+    save();renderAll();$('shopReceipt').hidden=false;
+    $('shopReceipt').textContent=fmt(p.dias)+' Dias added. ₱'+p.price+' was deducted from your CampusVoice wallet.';
+    toast('Dias purchase complete.');
+   }catch(error){toast(error instanceof Error?error.message:'Could not complete Dias purchase.')}
+  }});
+}
+function buySkin(s){
+ if(state.owned.includes(s.id)){toast('You already own this character.');return}
+ if(state.dias<s.cost){toast('Not enough Dias.');return}
+ confirmDialog({title:'Confirm character purchase',
+  rows:[['Character',s.name],['Cost',s.cost+' Dias'],['Dias now',fmt(state.dias)],['Dias after',fmt(state.dias-s.cost)]],
+  note:'This spends Dias from your CampusVoice game account.',
+  okText:'Confirm with Dias',
+  onOk:async()=>{
+   try{
+    const result=await postJson('/api/game-account',{action:'buySkin',skinId:s.id});
+    applyGameAccount(result);
+    log('FEATURE','Character: '+s.name,'−'+s.cost+' Dias','Paid with Dias');
+    save();renderAll();toast(s.name+' unlocked and equipped.');
+   }catch(error){toast(error instanceof Error?error.message:'Could not buy this character.')}
+  }});
+}
+async function equipSkin(s){
+ try{
+  const result=await postJson('/api/game-account',{action:'equipSkin',skinId:s.id});
+  applyGameAccount(result);toast(s.name+' equipped.');
+ }catch(error){toast(error instanceof Error?error.message:'Could not equip this character.')}
+}
+function redeem(r){
+ if(state.coins<r.coins){toast('Not enough Coins. You need '+fmt(r.coins)+'.');return}
+ if(modalOpen)return;
+ modalOpen=true;$('mTitle').textContent='Claim '+r.label;
+ const body=$('mBody');body.replaceChildren();
+ body.append(el('p','mut','Required: '+fmt(r.coins)+' Coins. Claims are reviewed and load is sent manually around 9 PM.'));
+ const form=document.createElement('form');form.className='claim-fields';
+ const inputs=[];
+ [['Recipient name','name','text'],['Email','email','email'],['Cellphone number','phone','tel']].forEach(([label,name,type])=>{
+  const wrapper=document.createElement('label');wrapper.className='claim-field';wrapper.textContent=label;
+  const input=document.createElement('input');input.name=name;input.type=type;input.required=true;
+  input.maxLength=name==='email'?254:100;input.autocomplete=name==='name'?'name':name==='email'?'email':'tel';
+  if(name==='phone'){input.minLength=7;input.maxLength=30;input.pattern='[+0-9() -]{7,30}';input.placeholder='e.g. 09XXXXXXXXX'}
+  wrapper.append(input);form.append(wrapper);inputs.push(input);
+ });
+ const error=el('p','');error.hidden=true;error.setAttribute('role','alert');form.append(error);
+ const submit=el('button','btn primary','Submit claim');submit.type='submit';form.append(submit);
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();if(!form.reportValidity())return;
+  submit.disabled=true;error.hidden=true;
+  try{
+   const result=await postJson('/api/game-rewards',{rewardId:r.id,name:inputs[0].value,email:inputs[1].value,phone:inputs[2].value});
+   state.coins-=r.coins;
+   log('REDEEM',r.label,'−'+fmt(r.coins)+' Coins','Pending admin review around 9 PM');
+   save();await refreshRewardClaims();renderAll();closeModal();toast(result.success||'Claim sent for admin review.');
+  }catch(cause){
+   error.textContent=cause instanceof Error?cause.message:'Could not submit reward claim.';
+   error.hidden=false;submit.disabled=false;
+  }
+ });
+ body.append(form);
+ $('mOk').hidden=true;$('mCancel').textContent='Cancel';$('modal').hidden=false;
+}
+
+let paused=false;
+function setTab(name){
+ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));
+ ['game','shop','rewards','history'].forEach(t=>$('tab-'+t).hidden=(t!==name));
+ if(name!=='game')pauseRun();renderAll();
+}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+
+/* ---- game ---- */
+const cv=$('cv'),ctx=cv.getContext('2d');
+const player={x:W/2,y:H-70,r:14};
+const keys={left:false,right:false,up:false,down:false};
+let target=null,run=null,acked=false,last=0,clock=0;
+const stars=Array.from({length:60},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*2+.5}));
+function fillRules(ul){ul.replaceChildren();RULES.forEach(t=>ul.append(el('li','',t)))}
+fillRules($('ovRules'));fillRules($('sideRules'));
+
+function showOverlay(mode,title,msg){
+ $('overlay').hidden=false;$('ovTitle').textContent=title;
+ const left=playsLeft();
+ $('ovMsg').textContent=(msg||'')+(left<1?'  You have used all '+DAILY_PLAYS+' plays for today. Come back tomorrow!':'');
+ const intro=mode==='intro';$('ovRules').hidden=!intro;$('ovAckRow').hidden=!intro;
+ const b=$('ovBtn');
+ if(intro){b.textContent='Start Game';b.disabled=!$('ackBox').checked||left<1;b.onclick=()=>{if($('ackBox').checked){acked=true;startRun()}}}
+ else if(mode==='paused'){b.textContent='Resume';b.disabled=false;b.onclick=resumeRun}
+ else{b.textContent='Play Again ('+left+' left today)';b.disabled=left<1;b.onclick=startRun}
+}
+$('ackBox').onchange=()=>{if(!acked)$('ovBtn').disabled=!$('ackBox').checked||playsLeft()<1};
+
+function startRun(){
+ if(!acked){showOverlay('intro','Welcome to Campus Coin Rush','Read the rules below before you start.');return}
+ if(playsLeft()<1){showOverlay('result','Daily limit reached','');return}
+ state.plays.n++;save();
+ run={active:true,time:RUN_SECONDS,score:0,collected:0,coins:[],obs:[],sc:0,so:0,done:{},survived:false,combo:1,comboT:0,fx:[],pt:[],shake:0,tp:0,fast:state.coins>=FAST_AT};
+ player.x=W/2;player.y=H-70;target=null;paused=false;
+ $('overlay').hidden=true;renderBalances();renderMissions();
+}
+function pauseRun(){if(run&&run.active&&!paused){paused=true;showOverlay('paused','Paused','Your run is paused.')}}
+function resumeRun(){if(run&&run.active){paused=false;$('overlay').hidden=true}}
+
+function burst(x,y,col,n,sp){for(let i=0;i<n;i++){const a=Math.random()*6.283,v=sp*(.3+Math.random());run.pt.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:.5+Math.random()*.5,m:1,col})}}
+function floatText(x,y,txt,col){run.fx.push({x,y,txt,col,l:1})}
+
+function finishRun(reason){
+ if(!run||!run.active)return;
+ run.active=false;
+ let title,msg;
+ if(reason==='death'){
+  title='You hit an obstacle!';
+  const cut=Math.min(DEATH_COST,state.coins);
+  if(cut>=1){
+   const before=state.coins;state.coins-=cut;
+   log('DEATH','Death penalty','−'+cut+' Coins','Applied (balance '+fmt(before)+' → '+fmt(state.coins)+')');
+   msg='Death penalty: '+cut+' Coins deducted'+(cut<DEATH_COST?' (all you had)':'')+' ('+fmt(before)+' → '+fmt(state.coins)+'). Your Dias were not changed.';
+  }else{
+   log('DEATH','Death — no Coins to deduct','0 Coins','No deduction (balance 0)');
+   msg='You have 0 Coins, so nothing was deducted. Your Dias were not changed.';
+  }
+  run.shake=.5;burst(player.x,player.y,'#ff6b6b',40,260);
+ }else{run.survived=true;checkMissions();title="Time's up!";msg='You survived the full run. No Coins were deducted.'}
+ const sc=Math.floor(run.score);if(sc>state.best)state.best=sc;
+ save();renderAll();
+ showOverlay('result',title,msg+'  Score: '+fmt(sc)+' · Coins collected: '+run.collected+'.');
+ toast(reason==='death'?msg:'Run complete!');
+}
+function checkMissions(){
+ MISSIONS.forEach(m=>{if(!run.done[m.id]&&m.check(run)){
+  run.done[m.id]=true;state.coins+=m.reward;
+  log('MISSION','Mission complete: '+m.text,'+'+m.reward+' Coins','Gameplay reward');
+  dirty=true;toast('Mission complete! +'+m.reward+' Coins');renderMissions();renderBalances()}});
+}
+
+function update(dt){
+ if(!run.fast&&state.coins>=FAST_AT){run.fast=true;toast('⚡ SPEED MODE! You reached '+fmt(FAST_AT)+' Coins. The game just got faster!');burst(player.x,player.y,'#fde047',30,220)}
+ const M=run.fast?FAST_MUL:1;
+ const dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);
+ if(dx||dy){const l=Math.hypot(dx,dy);player.x+=dx/l*SPEED*M*dt;player.y+=dy/l*SPEED*M*dt}
+ else if(target){const vx=target.x-player.x,vy=target.y-player.y,d=Math.hypot(vx,vy);if(d>4){const s=Math.min(SPEED*M*dt,d);player.x+=vx/d*s;player.y+=vy/d*s}}
+ player.x=Math.max(player.r,Math.min(W-player.r,player.x));player.y=Math.max(player.r,Math.min(H-player.r,player.y));
+ run.time-=dt;run.score+=dt;
+ const el_=RUN_SECONDS-run.time;
+ run.comboT-=dt;if(run.comboT<=0)run.combo=1;
+ const sk=skinOf(state.skin);run.tp-=dt;
+ if(run.tp<=0){run.tp=.03;run.pt.push({x:player.x+(Math.random()-.5)*6,y:player.y+8,vx:(Math.random()-.5)*20,vy:40+Math.random()*30,l:.45,m:.45,col:trailColor(sk,clock),sz:4})}
+ if(sk.sparkle&&Math.random()<.25)run.pt.push({x:player.x+(Math.random()-.5)*30,y:player.y+(Math.random()-.5)*30,vx:0,vy:-20,l:.6,m:.6,col:'#fff',sz:2});
+ run.sc-=dt;if(run.sc<=0&&run.coins.length<7){run.sc=.7;run.coins.push({x:20+Math.random()*(W-40),y:20+Math.random()*(H-120),ttl:7})}
+ run.so-=dt*M;if(run.so<=0){run.so=Math.max(.28,.65-el_*.006);const s=22+Math.random()*24;run.obs.push({x:Math.random()*(W-s),y:-s,w:s,h:s,vy:(90+Math.random()*80+el_*2.2)*M})}
+ for(let i=run.coins.length-1;i>=0;i--){const c=run.coins[i];c.ttl-=dt;
+  if(Math.hypot(player.x-c.x,player.y-c.y)<player.r+10){
+   run.coins.splice(i,1);state.coins++;run.collected++;run.combo=Math.min(5,run.combo+(run.comboT>0?1:0));run.comboT=2;
+   run.score+=10*run.combo;dirty=true;renderBalances();
+   burst(c.x,c.y,'#fbbf24',10,120);floatText(c.x,c.y,'+1'+(run.combo>1?' x'+run.combo:''),'#fde047');
+  }else if(c.ttl<=0)run.coins.splice(i,1)}
+ for(let i=run.obs.length-1;i>=0;i--){const o=run.obs[i];o.y+=o.vy*dt;
+  if(o.y>H){run.obs.splice(i,1);continue}
+  const nx=Math.max(o.x,Math.min(player.x,o.x+o.w)),ny=Math.max(o.y,Math.min(player.y,o.y+o.h));
+  if(Math.hypot(player.x-nx,player.y-ny)<player.r-2){finishRun('death');return}}
+ checkMissions();
+ if(run.time<=0){run.time=0;finishRun('time')}
+}
+function updateFx(dt){
+ if(!run)return;
+ run.pt=run.pt.filter(p=>(p.l-=dt)>0);run.pt.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt});
+ run.fx=run.fx.filter(f=>(f.l-=dt*1.1)>0);run.fx.forEach(f=>f.y-=30*dt);
+ if(run.shake>0)run.shake-=dt;
+}
+function draw(){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#1b1f6b');g.addColorStop(.6,'#0e1240');g.addColorStop(1,'#060a24');
+ ctx.save();
+ if(run&&run.shake>0)ctx.translate((Math.random()-.5)*10,(Math.random()-.5)*10);
+ ctx.fillStyle=g;ctx.fillRect(-10,-10,W+20,H+20);
+ stars.forEach(s=>{if(!paused&&run&&run.active)s.y=(s.y+s.z*.6)%H;ctx.fillStyle='rgba(255,255,255,'+(.25+s.z*.25)+')';ctx.fillRect(s.x,s.y,s.z,s.z)});
+ if(run){
+  run.pt.forEach(p=>{ctx.globalAlpha=Math.max(0,p.l/p.m);ctx.fillStyle=p.col;const z=p.sz||3;ctx.fillRect(p.x-z/2,p.y-z/2,z,z)});ctx.globalAlpha=1;
+  run.coins.forEach(c=>{
+   const w=Math.abs(Math.cos(clock*3+c.x)),bl=c.ttl<2&&Math.floor(clock*8)%2;if(bl)return;
+   ctx.save();ctx.translate(c.x,c.y);ctx.shadowColor='#fbbf24';ctx.shadowBlur=12;
+   ctx.fillStyle='#fbbf24';ctx.beginPath();ctx.ellipse(0,0,Math.max(2,9*w),9,0,0,7);ctx.fill();
+   ctx.shadowBlur=0;ctx.strokeStyle='#b45309';ctx.lineWidth=2;ctx.stroke();ctx.restore()});
+  run.obs.forEach(o=>{ctx.save();ctx.shadowColor='#ef4444';ctx.shadowBlur=14;
+   const og=ctx.createLinearGradient(o.x,o.y,o.x+o.w,o.y+o.h);og.addColorStop(0,'#fb7185');og.addColorStop(1,'#991b1b');
+   ctx.fillStyle=og;ctx.beginPath();ctx.roundRect?ctx.roundRect(o.x,o.y,o.w,o.h,6):ctx.rect(o.x,o.y,o.w,o.h);ctx.fill();
+   ctx.shadowBlur=0;ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(o.x+o.w*.25,o.y+o.h*.3,o.w*.14,o.h*.14);ctx.fillRect(o.x+o.w*.6,o.y+o.h*.3,o.w*.14,o.h*.14);ctx.restore()});
+ }
+ if(!run||run.active||(run&&run.shake<=0&&false))drawChar(ctx,player.x,player.y,16,skinOf(state.skin),clock);
+ if(run){ctx.font='bold 14px sans-serif';ctx.textAlign='center';run.fx.forEach(f=>{ctx.globalAlpha=Math.max(0,f.l);ctx.fillStyle=f.col;ctx.fillText(f.txt,f.x,f.y)});ctx.globalAlpha=1}
+ ctx.restore();
+}
+function drawPreviews(){
+ if($('tab-shop').hidden)return;
+ previews.forEach(p=>{const c=p.cv.getContext('2d');c.clearRect(0,0,96,96);drawChar(c,48,48,22,p.s,clock)});
+}
+function loop(ts){
+ requestAnimationFrame(loop);
+ const dt=Math.min(.05,(ts-last)/1000||0);last=ts;clock+=dt;
+ if(run&&run.active&&!paused)update(dt);
+ if(!paused)updateFx(dt);
+ draw();drawPreviews();
+ if(run){$('hTime').textContent=Math.ceil(run.time);$('hScore').textContent=fmt(Math.floor(run.score));$('hColl').textContent=run.collected;$('hCombo').textContent=run.combo;$('hFast').hidden=!run.fast}
+ if(dirty&&ts-lastSave>1000){save();lastSave=ts}
+}
+
+/* ---- input ---- */
+const keyMap={ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right',ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down'};
+window.addEventListener('keydown',e=>{const k=keyMap[e.key];if(!k||modalOpen||$('tab-game').hidden)return;e.preventDefault();keys[k]=true});
+window.addEventListener('keyup',e=>{const k=keyMap[e.key];if(k)keys[k]=false});
+window.addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+document.querySelectorAll('#dpad button').forEach(b=>{
+ const d=b.dataset.dir;
+ b.addEventListener('pointerdown',e=>{e.preventDefault();keys[d]=true});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>keys[d]=false));
+ b.addEventListener('contextmenu',e=>e.preventDefault())});
+function setTarget(e){const r=cv.getBoundingClientRect();target={x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H}}
+let dragging=false;
+cv.addEventListener('pointerdown',e=>{dragging=true;setTarget(e);cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(dragging)setTarget(e)});
+['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,()=>{dragging=false;target=null}));
+$('pauseBtn').onclick=()=>{if(run&&run.active){paused?resumeRun():pauseRun()}};
+$('restartBtn').onclick=()=>{
+ if(!acked){showOverlay('intro','Welcome to Campus Coin Rush','Read the rules below before you start.');return}
+ if(playsLeft()<1){showOverlay('result','Daily limit reached','');return}
+ startRun()};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseRun()});
+window.addEventListener('beforeunload',save);
+
+if(!storageOK)$('storageBanner').textContent+=' Browser storage is unavailable, so game Coins and progress last only until you close this page.';
+renderAll();
+showOverlay('intro','Welcome to Campus Coin Rush','Read the rules below before you start.');
+refreshGameAccount();
+refreshRewardClaims();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

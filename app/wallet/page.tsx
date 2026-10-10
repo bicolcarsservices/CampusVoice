@@ -25,7 +25,7 @@ export default async function WalletPage() {
       .select("id,direction,kind,amount_centavos,balance_after_centavos,note,game_key,created_at")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
     supabase.from("wallet_topup_requests")
-      .select("id,amount_centavos,payment_reference,status,review_note,created_at")
+      .select("id,amount_centavos,received_centavos,fee_centavos,credited_centavos,payment_reference,status,review_note,created_at")
       .eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
     supabase.from("wallet_withdrawal_requests")
       .select("id,amount_centavos,payout_method,status,review_note,created_at")
@@ -71,6 +71,9 @@ export default async function WalletPage() {
             <div>
               <p className="font-semibold">{request.requestType} · {formatCentavos(request.amount_centavos)}</p>
               <p className="text-xs capitalize text-slate-500">{request.status} · {new Date(request.created_at).toLocaleString()}</p>
+              {"fee_centavos" in request && request.status === "approved" && (
+                <p className="text-xs text-slate-500">Received: {formatCentavos(request.received_centavos)} · Deduction: {formatCentavos(request.fee_centavos)} · Wallet credit: {formatCentavos(request.credited_centavos)}</p>
+              )}
               {"payment_reference" in request && request.payment_reference && <p className="text-xs text-slate-500">Reference: {request.payment_reference}</p>}
               {request.review_note && <p className="text-xs text-slate-500">Admin note: {request.review_note}</p>}
             </div>

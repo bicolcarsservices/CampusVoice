@@ -23,13 +23,13 @@ export function WalletTopupForm() {
   const [state, dispatch] = useFormState(requestWalletTopup, null);
   return (
     <form action={dispatch} className="space-y-3">
-      <label className="block text-sm">Top-up amount (PHP)
+      <label className="block text-sm">Amount sent to Maya (PHP)
         <input name="amount_php" type="number" min="1" max="100000" step="0.01" required className="input mt-1" placeholder="100.00" />
       </label>
       <label className="block text-sm">Maya payment reference (optional)
         <input name="payment_reference" maxLength={120} className="input mt-1" placeholder="Reference number or sender name" />
       </label>
-      <p className="text-xs text-slate-500">Send the exact amount using the Maya QR code. The balance is credited after an administrator verifies the payment.</p>
+      <p className="text-xs text-slate-500">Enter the amount you sent using the Maya QR code. An administrator verifies it and enters any applicable deduction before crediting your wallet.</p>
       <SubmitButton label="Submit top-up for verification" />
       <FormFeedback state={state} />
     </form>

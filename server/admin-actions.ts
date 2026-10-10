@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { parsePhpAmount } from "@/lib/wallet";
+import { parsePhpAmount, parsePhpDeduction } from "@/lib/wallet";
 
 const uuid = z.string().uuid();
 
@@ -140,16 +140,44 @@ export async function adminReviewWalletTopup(formData: FormData) {
   const requestId = uuid.safeParse(formData.get("request_id"));
   const decision = z.enum(["approve", "reject"]).safeParse(formData.get("decision"));
   const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
-  if (!requestId.success || !decision.success || !reason.success) return { error: "Invalid top-up review." };
+  const fee = decision.success && decision.data === "approve" ? parsePhpDeduction(formData.get("fee_php")) : 0;
+  const received = decision.success && decision.data === "approve" ? parsePhpAmount(formData.get("received_php")) : 0;
+  if (!requestId.success || !decision.success || !reason.success || fee === null || received === null) {
+    return { error: "Enter the verified Maya amount received and a valid fee/deduction." };
+  }
+  if (decision.data === "approve" && fee > 0 && !reason.data) {
+    return { error: "Add a review note explaining the fee/deduction." };
+  }
   const { error } = await supabase.rpc("admin_review_wallet_topup", {
     p_request: requestId.data,
     p_approve: decision.data === "approve",
     p_reason: reason.data || null,
+    p_received_centavos: received,
+    p_fee_centavos: fee,
   });
   if (error) return { error: `Could not review top-up: ${error.message}` };
   revalidatePath("/admin/wallet");
   revalidatePath("/wallet");
-  return { success: decision.data === "approve" ? "Top-up verified and balance credited." : "Top-up request rejected." };
+  return { success: decision.data === "approve" ? "Top-up verified; net amount credited after the deduction." : "Top-up request rejected." };
+}
+
+export async function adminReviewGameReward(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const claimId = uuid.safeParse(formData.get("claim_id"));
+  const decision = z.enum(["fulfilled", "rejected"]).safeParse(formData.get("decision"));
+  const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
+  if (!claimId.success || !decision.success || !reason.success ||
+      (decision.data === "fulfilled" && !reason.data)) return { error: "Enter a valid game reward decision and fulfillment note." };
+  const { error } = await supabase.rpc("admin_review_game_reward", {
+    p_claim: claimId.data,
+    p_decision: decision.data,
+    p_reason: reason.data || null,
+  });
+  if (error) return { error: `Could not review game reward: ${error.message}` };
+  revalidatePath("/admin/game-rewards");
+  revalidatePath("/games/campus-coin-rush");
+  return { success: decision.data === "fulfilled" ? "Reward marked as sent." : "Reward claim rejected." };
 }
 
 export async function adminReviewWalletWithdrawal(formData: FormData) {

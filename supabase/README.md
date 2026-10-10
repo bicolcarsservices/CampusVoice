@@ -45,16 +45,32 @@ the user submits a new request.
 
 1. Run `supabase/wallet.sql` after `supabase/schema.sql` in the SQL Editor.
    This creates the protected wallet ledger, manual top-up and withdrawal
-   requests, admin review functions, and game-period charging functions.
-2. Put the Maya QR image at `public/maya-qr.jpg` to show it on `/wallet` and
-   subscription plans.
-   Users submit the amount and payment reference after sending the payment;
-   no balance is added until an admin verifies it under **Admin → Wallet**.
-3. Withdrawals reserve the requested balance immediately. Admins approve the
+   requests, admin review functions, and game wallet account. Re-run it to add
+   the top-up deduction fields and Dias purchase functions.
+2. Run `supabase/game-rewards.sql` after the schema and wallet scripts to add
+   private Campus Coin Rush claim records and admin review functions.
+3. Put the Maya QR image at `public/maya-qr.jpg` to show it on `/wallet` and
+   subscription plans. Users submit the amount they sent and payment reference;
+   an admin verifies the Maya transfer, enters the amount actually received
+   and any fee/deduction, and checks the net wallet credit before approving.
+   A note is required when a deduction is applied. The net amount is credited,
+   not the requested or gross transfer amount.
+4. The game is available to signed-in users at `/games/campus-coin-rush`.
+   Dias packages cost ₱49/₱99/₱199/₱399 and credit 50/120/300/700 Dias,
+   respectively, from the CampusVoice wallet. There is no extra game VAT or
+   fee. Dias balances and character purchases are stored server-side.
+5. Load rewards are not cash withdrawals. A player can submit a claim for
+   ₱10 mobile load (25,000 Coins) or ₱59 GoSURF load (60,000 Coins), entering
+   the recipient name, email, and cellphone number. Claims are pending until
+   an admin manually sends the load and marks it fulfilled, normally during
+   the 9 PM review. Coins and play progress remain browser-local and can be
+   edited, so claims are self-reported and require manual review; no load is
+   sent automatically.
+6. Withdrawals reserve the requested balance immediately. Admins approve the
    request, send the payout manually to the submitted account, then mark it
    paid. Rejecting a request or a user's cancellation returns the reserved
    balance. Payout details are visible only to the requester and admins.
-4. Configure each future game's price and period under **Admin → Wallet**.
+7. Configure each future game's price and period under **Admin → Wallet**.
    The default example can be set to ₱1.00 per 30 minutes. Rates start
    inactive. Game backends should call
    `public.charge_game_period(user_id, game_key, session_id, period_number)`

@@ -43,6 +43,18 @@ create table if not exists public.wallet_topup_requests (
   reviewed_at timestamptz
 );
 
+alter table public.wallet_topup_requests
+  add column if not exists received_centavos bigint not null default 0 check (received_centavos >= 0),
+  add column if not exists fee_centavos bigint not null default 0 check (fee_centavos >= 0),
+  add column if not exists credited_centavos bigint not null default 0 check (credited_centavos >= 0);
+
+update public.wallet_topup_requests
+   set received_centavos = amount_centavos
+ where status = 'approved' and received_centavos = 0;
+update public.wallet_topup_requests
+   set credited_centavos = amount_centavos
+ where status = 'approved' and credited_centavos = 0;
+
 create table if not exists public.wallet_withdrawal_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -72,16 +84,34 @@ create table if not exists public.wallet_game_rates (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.wallet_game_accounts (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  dias bigint not null default 0 check (dias >= 0),
+  owned_skins text[] not null default array['orb']::text[],
+  equipped_skin text not null default 'orb',
+  updated_at timestamptz not null default now(),
+  check (equipped_skin = any(owned_skins))
+);
+
+alter table public.wallet_transactions
+  drop constraint if exists wallet_transactions_kind_check;
+alter table public.wallet_transactions
+  add constraint wallet_transactions_kind_check
+  check (kind in ('topup', 'withdrawal', 'withdrawal_return', 'game_charge',
+                  'admin_adjustment', 'dias_purchase'));
+
 alter table public.wallets enable row level security;
 alter table public.wallet_transactions enable row level security;
 alter table public.wallet_topup_requests enable row level security;
 alter table public.wallet_withdrawal_requests enable row level security;
 alter table public.wallet_game_rates enable row level security;
+alter table public.wallet_game_accounts enable row level security;
 
 revoke all on public.wallets, public.wallet_transactions, public.wallet_topup_requests,
-  public.wallet_withdrawal_requests, public.wallet_game_rates from public, anon, authenticated;
+  public.wallet_withdrawal_requests, public.wallet_game_rates, public.wallet_game_accounts
+  from public, anon, authenticated;
 grant select on public.wallets, public.wallet_transactions, public.wallet_topup_requests,
-  public.wallet_withdrawal_requests to authenticated;
+  public.wallet_withdrawal_requests, public.wallet_game_accounts to authenticated;
 grant select on public.wallet_game_rates to authenticated;
 
 drop policy if exists wallet_read_own_or_admin on public.wallets;
@@ -99,6 +129,9 @@ create policy wallet_withdrawals_read_own_or_admin on public.wallet_withdrawal_r
 drop policy if exists wallet_game_rates_read_active on public.wallet_game_rates;
 create policy wallet_game_rates_read_active on public.wallet_game_rates for select
   using (is_active or public.is_admin());
+drop policy if exists wallet_game_accounts_read_own on public.wallet_game_accounts;
+create policy wallet_game_accounts_read_own on public.wallet_game_accounts for select
+  using (user_id = auth.uid() or public.is_admin());
 
 create or replace function public.my_wallet_balance() returns bigint
 language plpgsql security definer set search_path = public as $$
@@ -108,6 +141,92 @@ begin
   insert into public.wallets (user_id) values (uid) on conflict (user_id) do nothing;
   select balance_centavos into amount from public.wallets where user_id = uid;
   return amount;
+end $$;
+
+create or replace function public.purchase_game_dias(p_package_id text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  price bigint;
+  dias_amount bigint;
+  wallet_balance bigint;
+  game_dias bigint;
+  purchase_id uuid := gen_random_uuid();
+begin
+  if uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  if not public.is_active_user() then raise exception 'ACCOUNT_NOT_ACTIVE'; end if;
+  case p_package_id
+    when 'p1' then price := 4900; dias_amount := 50;
+    when 'p2' then price := 9900; dias_amount := 120;
+    when 'p3' then price := 19900; dias_amount := 300;
+    when 'p4' then price := 39900; dias_amount := 700;
+    else raise exception 'INVALID_DIAS_PACKAGE';
+  end case;
+
+  insert into public.wallets (user_id) values (uid) on conflict (user_id) do nothing;
+  insert into public.wallet_game_accounts (user_id) values (uid) on conflict (user_id) do nothing;
+  select balance_centavos into wallet_balance
+    from public.wallets where user_id = uid for update;
+  if wallet_balance < price then raise exception 'INSUFFICIENT_BALANCE'; end if;
+  update public.wallets
+     set balance_centavos = balance_centavos - price, updated_at = now()
+   where user_id = uid returning balance_centavos into wallet_balance;
+
+  update public.wallet_game_accounts
+     set dias = dias + dias_amount, updated_at = now()
+   where user_id = uid returning dias into game_dias;
+  insert into public.wallet_transactions
+    (user_id, direction, kind, amount_centavos, balance_after_centavos,
+     reference_id, game_key, note)
+  values (uid, 'debit', 'dias_purchase', price, wallet_balance,
+          purchase_id::text, 'campus-coin-rush', dias_amount || ' Dias (' || p_package_id || ')');
+
+  return jsonb_build_object('wallet_balance_centavos', wallet_balance, 'dias', game_dias);
+end $$;
+
+create or replace function public.purchase_game_skin(p_skin_id text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  skin_cost bigint;
+  skin_name text;
+  current_dias bigint;
+  skin_list text[];
+begin
+  if uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  if not public.is_active_user() then raise exception 'ACCOUNT_NOT_ACTIVE'; end if;
+  case p_skin_id
+    when 'star' then skin_cost := 30; skin_name := 'Gold Star';
+    when 'rocket' then skin_cost := 45; skin_name := 'Neon Rocket';
+    when 'gem' then skin_cost := 60; skin_name := 'Crystal Gem';
+    when 'flame' then skin_cost := 80; skin_name := 'Flame Hex';
+    when 'galaxy' then skin_cost := 120; skin_name := 'Galaxy Nova';
+    else raise exception 'INVALID_GAME_SKIN';
+  end case;
+
+  insert into public.wallet_game_accounts (user_id) values (uid) on conflict (user_id) do nothing;
+  select dias, owned_skins into current_dias, skin_list
+    from public.wallet_game_accounts where user_id = uid for update;
+  if p_skin_id = any(skin_list) then raise exception 'SKIN_ALREADY_OWNED'; end if;
+  if current_dias < skin_cost then raise exception 'INSUFFICIENT_DIAS'; end if;
+  update public.wallet_game_accounts
+     set dias = dias - skin_cost,
+         owned_skins = array_append(owned_skins, p_skin_id),
+         equipped_skin = p_skin_id,
+         updated_at = now()
+   where user_id = uid returning dias, owned_skins into current_dias, skin_list;
+  return jsonb_build_object('dias', current_dias, 'owned_skins', skin_list,
+                            'equipped_skin', p_skin_id, 'skin_name', skin_name);
+end $$;
+
+create or replace function public.equip_game_skin(p_skin_id text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  update public.wallet_game_accounts
+     set equipped_skin = p_skin_id, updated_at = now()
+   where user_id = auth.uid() and p_skin_id = any(owned_skins);
+  if not found then raise exception 'SKIN_NOT_OWNED'; end if;
 end $$;
 
 create or replace function public.request_wallet_topup(
@@ -127,11 +246,15 @@ begin
   return request_id;
 end $$;
 
+drop function if exists public.admin_review_wallet_topup(uuid, boolean, text);
+drop function if exists public.admin_review_wallet_topup(uuid, boolean, text, bigint);
 create or replace function public.admin_review_wallet_topup(
-  p_request uuid, p_approve boolean, p_reason text default null
+  p_request uuid, p_approve boolean, p_reason text default null,
+  p_received_centavos bigint default null, p_fee_centavos bigint default 0
 ) returns void
 language plpgsql security definer set search_path = public as $$
-declare topup public.wallet_topup_requests; new_balance bigint;
+declare topup public.wallet_topup_requests; new_balance bigint; net_credit bigint;
+  received bigint; fee bigint;
 begin
   perform public.assert_admin();
   if p_approve is null then raise exception 'INVALID_DECISION'; end if;
@@ -140,25 +263,42 @@ begin
   if topup.id is null or topup.status <> 'pending' then raise exception 'TOPUP_NOT_PENDING'; end if;
 
   if p_approve then
+    received := coalesce(p_received_centavos, topup.amount_centavos);
+    fee := coalesce(p_fee_centavos, 0);
+    if received not between 100 and 10000000 then raise exception 'INVALID_TOPUP_AMOUNT_RECEIVED'; end if;
+    if fee < 0 or fee > received - 100 then raise exception 'INVALID_TOPUP_FEE'; end if;
+    if fee > 0 and nullif(trim(p_reason), '') is null then raise exception 'INVALID_FEE_NOTE'; end if;
+    net_credit := received - fee;
     insert into public.wallets (user_id) values (topup.user_id) on conflict (user_id) do nothing;
     update public.wallets
-       set balance_centavos = balance_centavos + topup.amount_centavos, updated_at = now()
+       set balance_centavos = balance_centavos + net_credit, updated_at = now()
      where user_id = topup.user_id
      returning balance_centavos into new_balance;
     insert into public.wallet_transactions
       (user_id, direction, kind, amount_centavos, balance_after_centavos, reference_id, note)
     values
-      (topup.user_id, 'credit', 'topup', topup.amount_centavos, new_balance, topup.id::text, p_reason);
+      (topup.user_id, 'credit', 'topup', net_credit, new_balance, topup.id::text,
+       concat_ws(' · ', nullif(trim(p_reason), ''), 'Received ' || (received / 100.0)::text,
+                 'deduction ' || (fee / 100.0)::text));
+  else
+    received := 0;
+    fee := 0;
+    net_credit := 0;
   end if;
 
   update public.wallet_topup_requests
      set status = case when p_approve then 'approved' else 'rejected' end,
+         received_centavos = received,
+         fee_centavos = fee,
+         credited_centavos = net_credit,
          reviewed_by = auth.uid(), review_note = nullif(trim(p_reason), ''), reviewed_at = now()
    where id = topup.id;
   perform public.admin_log(
     case when p_approve then 'approve_wallet_topup' else 'reject_wallet_topup' end,
     'wallet_topup', topup.id::text, p_reason,
-    jsonb_build_object('user_id', topup.user_id, 'amount_centavos', topup.amount_centavos)
+    jsonb_build_object('user_id', topup.user_id, 'requested_centavos', topup.amount_centavos,
+                       'received_centavos', received,
+                       'fee_centavos', fee, 'credited_centavos', net_credit)
   );
 end $$;
 
@@ -338,20 +478,26 @@ begin
 end $$;
 
 revoke all on function public.my_wallet_balance() from public, anon;
+revoke all on function public.purchase_game_dias(text) from public, anon;
+revoke all on function public.purchase_game_skin(text) from public, anon;
+revoke all on function public.equip_game_skin(text) from public, anon;
 revoke all on function public.request_wallet_topup(bigint, text) from public, anon;
-revoke all on function public.admin_review_wallet_topup(uuid, boolean, text) from public, anon;
+revoke all on function public.admin_review_wallet_topup(uuid, boolean, text, bigint, bigint) from public, anon;
 revoke all on function public.request_wallet_withdrawal(bigint, text, text, text) from public, anon;
 revoke all on function public.cancel_my_wallet_withdrawal(uuid) from public, anon;
 revoke all on function public.admin_review_wallet_withdrawal(uuid, text, text) from public, anon;
 revoke all on function public.admin_set_wallet_game_rate(text, text, bigint, integer, boolean) from public, anon;
 revoke all on function public.charge_game_period(uuid, text, uuid, integer) from public, anon;
 grant execute on function public.my_wallet_balance(),
+  public.purchase_game_dias(text),
+  public.purchase_game_skin(text),
+  public.equip_game_skin(text),
   public.request_wallet_topup(bigint, text),
   public.request_wallet_withdrawal(bigint, text, text, text),
   public.cancel_my_wallet_withdrawal(uuid),
   public.charge_game_period(uuid, text, uuid, integer)
   to authenticated;
-grant execute on function public.admin_review_wallet_topup(uuid, boolean, text),
+grant execute on function public.admin_review_wallet_topup(uuid, boolean, text, bigint, bigint),
   public.admin_review_wallet_withdrawal(uuid, text, text),
   public.admin_set_wallet_game_rate(text, text, bigint, integer, boolean)
   to authenticated;

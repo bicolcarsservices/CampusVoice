@@ -30,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div><p className="eyebrow">CampusVoice management</p><h1 className="text-3xl font-extrabold">Admin dashboard</h1></div>
         <nav aria-label="Admin navigation" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 text-sm dark:border-slate-800">
           {[["Overview", "/admin"], ["Posts", "/admin/posts"], ["Comments", "/admin/comments"], ["Reports", "/admin/reports"], ["Users", "/admin/users"],
-            ["Subscriptions", "/admin/subscriptions"], ["Wallet", "/admin/wallet"], ["Plans", "/admin/plans"], ["Settings", "/admin/settings"],
+            ["Subscriptions", "/admin/subscriptions"], ["Wallet", "/admin/wallet"], ["Game rewards", "/admin/game-rewards"], ["Plans", "/admin/plans"], ["Settings", "/admin/settings"],
             ["Announcements", "/admin/announcements"], ["Schools", "/admin/schools"],
             ["Categories", "/admin/categories"]].map(([label, href]) => (
             <Link className="rounded-lg px-3 py-2 font-medium hover:bg-violet-50 hover:text-brand dark:hover:bg-slate-800" href={href} key={href}>{label}</Link>
