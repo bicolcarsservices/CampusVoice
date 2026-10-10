@@ -17,6 +17,7 @@ h2{margin:.2rem 0 .6rem}h3{margin:.1rem 0 .3rem}
 .bal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:.85rem}
 .bal b{font-size:1.05rem;margin-left:4px}.bal.coins b{color:var(--coin)}.bal.dias b{color:var(--dia)}
 .bal small{display:block;font-size:.6rem;color:var(--mut)}
+.balance-icon{font-size:1.1rem}
 nav{display:flex;gap:4px;padding:8px 10px;background:#0a1030ee;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;overflow-x:auto;border-bottom:1px solid var(--line)}
 nav button{flex:1;min-width:max-content;background:transparent;color:var(--mut);border:1px solid transparent;padding:9px 12px;border-radius:10px;font-size:.9rem;cursor:pointer}
 nav button.active{background:linear-gradient(135deg,#2b3a9a,#5b2a9a);color:#fff}
@@ -101,7 +102,9 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
             <p id="ovMsg" style="margin:0"></p>
             <ul id="ovRules"></ul>
             <label id="ovAckRow"><input type="checkbox" id="ackBox"> I understand these rules.</label>
-            <div class="row"><button class="btn primary" id="ovBtn"></button></div>
+            <div class="row">
+              <button class="btn primary" id="ovBtn"></button>
+            </div>
           </div>
         </div>
         <div class="dpad" id="dpad">
@@ -121,6 +124,11 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
           </div>
           <p class="mut" style="margin-top:8px">Restarting is not a death (no Coins deducted), but it starts a new run and uses 1 of your 10 daily plays.</p>
           <p class="mut" style="margin-top:6px">Character: <b id="curSkin">Blue Orb</b> — change it in the Dias Shop.</p>
+          <h3 style="margin-top:12px">Level select</h3>
+          <label class="mut" for="levelSelect">Unlocked levels</label>
+          <select id="levelSelect" style="display:block;width:100%;margin-top:4px"></select>
+          <p class="mut" id="levelProgressText" style="margin-top:6px"></p>
+          <button class="btn primary" id="unlockLevelBtn" type="button"></button>
         </div>
         <div class="panel">
           <h3>Missions (this run)</h3>
@@ -167,6 +175,7 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
         <option value="REDEEM">Load reward claims</option>
         <option value="DEATH">Death deductions</option>
         <option value="MISSION">Mission rewards</option>
+        <option value="LEVEL">Level unlocks</option>
       </select>
     </div>
     <div class="hist" id="histList"></div>
@@ -189,7 +198,7 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
 (() => {
 'use strict';
 const KEY='campusCoinRushStandaloneDemo_v2';
-const W=360,H=480,RUN_SECONDS=60,SPEED=230,DEATH_COST=25,DAILY_PLAYS=10,FAST_AT=1000,FAST_MUL=1.35;
+const W=360,H=480,RUN_SECONDS=60,MAX_LEVEL=350,LEVEL_UNLOCK_COST=1000,SPEED=230,DEATH_COST=25,DAILY_PLAYS=10,FAST_AT=1000,FAST_MUL=1.35;
 const PACKAGES=[
  {id:'p1',name:'Starter Pack',dias:50,price:49,desc:'A small bundle to unlock a character.'},
  {id:'p2',name:'Student Pack',dias:120,price:99,desc:'Enough for a mid-tier character.'},
@@ -214,6 +223,8 @@ const RULES=[
  'If you die, '+DEATH_COST+' Coins are deducted. If you have fewer than '+DEATH_COST+', only what you have is deducted. Your balance never goes below 0, and with 0 Coins nothing is deducted.',
  'Dias are never deducted when you die.',
  'SPEED MODE: once your Coin balance reaches '+FAST_AT.toLocaleString('en-US')+' or more, the game runs faster (obstacles fall and spawn faster, and your character moves faster) for that run. Starting a run with '+FAST_AT.toLocaleString('en-US')+'+ Coins also starts in Speed Mode.',
+ 'Each run lasts 60 seconds. Collect Coins and avoid obstacles to improve your score.',
+ 'You can unlock up to '+MAX_LEVEL+' levels for '+LEVEL_UNLOCK_COST.toLocaleString('en-US')+' Coins each. Choose any unlocked level and keep collecting Coins.',
  'You can play '+DAILY_PLAYS+' runs per day (resets at your local midnight). Restarting counts as a new run.',
  'The game is free to play with 0 Coins and 0 Dias. There is no paid entry, no gambling, and no cash withdrawal.',
  'Coins are browser-saved game points and can be edited. Claims for ₱10 mobile load (25,000 Coins) or ₱59 GoSURF load (60,000 Coins) are manually reviewed by an admin and are not sent automatically.',
@@ -228,12 +239,14 @@ function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');cle
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()};
 
 let storageOK=true;
-const DEFAULT=()=>({coins:0,dias:0,owned:['orb'],skin:'orb',best:0,plays:{d:today(),n:0},history:[]});
+const DEFAULT=()=>({coins:0,dias:0,owned:['orb'],skin:'orb',best:0,unlockedLevel:1,selectedLevel:1,plays:{d:today(),n:0},history:[]});
 function load(){
  try{
   const raw=localStorage.getItem(KEY);if(!raw)return DEFAULT();
   const o=JSON.parse(raw)||{};const n=v=>(Number.isFinite(v)&&v>0)?Math.floor(v):0;
   const s=DEFAULT();s.coins=n(o.coins);s.dias=n(o.dias);s.best=n(o.best);
+  s.unlockedLevel=Math.max(1,Math.min(MAX_LEVEL,n(o.unlockedLevel)||1));
+  s.selectedLevel=Math.max(1,Math.min(s.unlockedLevel,n(o.selectedLevel)||1));
   const ids=SKINS.map(k=>k.id);
   s.owned=Array.isArray(o.owned)?[...new Set(['orb',...o.owned.filter(i=>ids.includes(i))])]:['orb'];
   s.skin=s.owned.includes(o.skin)?o.skin:'orb';
@@ -296,6 +309,19 @@ function renderBalances(){
  $('walletBal').textContent='₱'+(gameAccount.walletBalanceCentavos/100).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
  $('bestScore').textContent=fmt(state.best);$('hPlays').textContent=playsLeft();
  $('curSkin').textContent=skinOf(state.skin).name;
+ const select=$('levelSelect'),selected=String(state.selectedLevel);
+ select.replaceChildren();
+ for(let level=1;level<=state.unlockedLevel;level++){
+  const option=el('option','',`Level ${level}${level===state.unlockedLevel&&level<MAX_LEVEL?' · next unlock costs '+fmt(LEVEL_UNLOCK_COST)+' Coins':''}`);
+  option.value=String(level);select.append(option);
+ }
+ select.value=selected;select.disabled=!!(run&&run.active);
+ $('levelProgressText').textContent='Level '+state.unlockedLevel+' of '+MAX_LEVEL+' unlocked. Unlock the next level for '+fmt(LEVEL_UNLOCK_COST)+' Coins.';
+ const unlock=$('unlockLevelBtn');
+ unlock.textContent=state.unlockedLevel>=MAX_LEVEL?'All levels unlocked':`Unlock Level ${state.unlockedLevel+1} — 🪙 ${fmt(LEVEL_UNLOCK_COST)}`;
+ unlock.disabled=state.unlockedLevel>=MAX_LEVEL||state.coins<LEVEL_UNLOCK_COST||!!(run&&run.active);
+ unlock.title=state.coins<LEVEL_UNLOCK_COST?'Collect '+fmt(LEVEL_UNLOCK_COST-state.coins)+' more Coins to unlock the next level':'';
+ $('restartBtn').textContent='↻ Restart (uses 1 play)';
 }
 function renderMissions(){
  const box=$('missions');box.replaceChildren();
@@ -351,6 +377,30 @@ function renderHistory(){
  items.forEach(h=>l.append(histItem(h)));
 }
 function renderAll(){renderBalances();renderShop();renderRewards();renderHistory();renderMissions()}
+$('levelSelect').onchange=()=>{
+ state.selectedLevel=Math.max(1,Math.min(state.unlockedLevel,Number($('levelSelect').value)||1));
+ save();renderBalances();
+};
+$('unlockLevelBtn').onclick=()=>{
+ if(state.unlockedLevel>=MAX_LEVEL||state.coins<LEVEL_UNLOCK_COST||run&&run.active)return;
+ const next=state.unlockedLevel+1;
+ confirmDialog({
+  title:'Unlock Level '+next,
+  rows:[['Unlock cost',fmt(LEVEL_UNLOCK_COST)+' Coins'],['Coins after unlock',fmt(state.coins-LEVEL_UNLOCK_COST)]],
+  note:'This unlock uses game Coins only. It does not use a daily play attempt.',
+  okText:'Unlock with Coins',
+  onOk:()=>{
+   if(state.unlockedLevel>=MAX_LEVEL||state.coins<LEVEL_UNLOCK_COST)return;
+   const unlocked=state.unlockedLevel+1;
+   state.coins-=LEVEL_UNLOCK_COST;
+   state.unlockedLevel=unlocked;
+   state.selectedLevel=unlocked;
+   log('LEVEL','Unlocked Level '+unlocked,'−'+fmt(LEVEL_UNLOCK_COST)+' Coins','Level unlock');
+   save();renderAll();
+   toast('Level '+unlocked+' unlocked! You can start it whenever you are ready.');
+  }
+ });
+};
 $('histFilter').onchange=renderHistory;
 $('refreshClaimsBtn').onclick=refreshRewardClaims;
 
@@ -491,13 +541,17 @@ function showOverlay(mode,title,msg){
 }
 $('ackBox').onchange=()=>{if(!acked)$('ovBtn').disabled=!$('ackBox').checked||playsLeft()<1};
 
+function beginLevel(level){
+ run={active:true,level,time:RUN_SECONDS,score:0,collected:0,coins:[],obs:[],sc:0,so:0,done:{},survived:false,combo:1,comboT:0,fx:[],pt:[],shake:0,tp:0,fast:state.coins>=FAST_AT};
+ state.selectedLevel=level;
+ player.x=W/2;player.y=H-70;target=null;paused=false;
+ $('overlay').hidden=true;save();renderBalances();renderMissions();
+}
 function startRun(){
  if(!acked){showOverlay('intro','Welcome to Campus Coin Rush','Read the rules below before you start.');return}
  if(playsLeft()<1){showOverlay('result','Daily limit reached','');return}
  state.plays.n++;save();
- run={active:true,time:RUN_SECONDS,score:0,collected:0,coins:[],obs:[],sc:0,so:0,done:{},survived:false,combo:1,comboT:0,fx:[],pt:[],shake:0,tp:0,fast:state.coins>=FAST_AT};
- player.x=W/2;player.y=H-70;target=null;paused=false;
- $('overlay').hidden=true;renderBalances();renderMissions();
+ beginLevel(state.selectedLevel);
 }
 function pauseRun(){if(run&&run.active&&!paused){paused=true;showOverlay('paused','Paused','Your run is paused.')}}
 function resumeRun(){if(run&&run.active){paused=false;$('overlay').hidden=true}}
@@ -537,6 +591,7 @@ function checkMissions(){
 function update(dt){
  if(!run.fast&&state.coins>=FAST_AT){run.fast=true;toast('⚡ SPEED MODE! You reached '+fmt(FAST_AT)+' Coins. The game just got faster!');burst(player.x,player.y,'#fde047',30,220)}
  const M=run.fast?FAST_MUL:1;
+ const levelSpeed=Math.min(2,1+(run.level-1)*.004);
  const dx=(keys.right?1:0)-(keys.left?1:0),dy=(keys.down?1:0)-(keys.up?1:0);
  if(dx||dy){const l=Math.hypot(dx,dy);player.x+=dx/l*SPEED*M*dt;player.y+=dy/l*SPEED*M*dt}
  else if(target){const vx=target.x-player.x,vy=target.y-player.y,d=Math.hypot(vx,vy);if(d>4){const s=Math.min(SPEED*M*dt,d);player.x+=vx/d*s;player.y+=vy/d*s}}
@@ -548,7 +603,7 @@ function update(dt){
  if(run.tp<=0){run.tp=.03;run.pt.push({x:player.x+(Math.random()-.5)*6,y:player.y+8,vx:(Math.random()-.5)*20,vy:40+Math.random()*30,l:.45,m:.45,col:trailColor(sk,clock),sz:4})}
  if(sk.sparkle&&Math.random()<.25)run.pt.push({x:player.x+(Math.random()-.5)*30,y:player.y+(Math.random()-.5)*30,vx:0,vy:-20,l:.6,m:.6,col:'#fff',sz:2});
  run.sc-=dt;if(run.sc<=0&&run.coins.length<7){run.sc=.7;run.coins.push({x:20+Math.random()*(W-40),y:20+Math.random()*(H-120),ttl:7})}
- run.so-=dt*M;if(run.so<=0){run.so=Math.max(.28,.65-el_*.006);const s=22+Math.random()*24;run.obs.push({x:Math.random()*(W-s),y:-s,w:s,h:s,vy:(90+Math.random()*80+el_*2.2)*M})}
+ run.so-=dt*M*levelSpeed;if(run.so<=0){run.so=Math.max(.28,.65-el_*.006);const s=22+Math.random()*24;run.obs.push({x:Math.random()*(W-s),y:-s,w:s,h:s,vy:(90+Math.random()*80+el_*2.2)*M*levelSpeed})}
  for(let i=run.coins.length-1;i>=0;i--){const c=run.coins[i];c.ttl-=dt;
   if(Math.hypot(player.x-c.x,player.y-c.y)<player.r+10){
    run.coins.splice(i,1);state.coins++;run.collected++;run.combo=Math.min(5,run.combo+(run.comboT>0?1:0));run.comboT=2;

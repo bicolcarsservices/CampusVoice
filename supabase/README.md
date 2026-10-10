@@ -66,6 +66,11 @@ the user submits a new request.
    the 9 PM review. Coins and play progress remain browser-local and can be
    edited, so claims are self-reported and require manual review; no load is
    sent automatically.
+   Campus Coin Rush retains its original 60-second coin-collecting gameplay.
+   Players can unlock up to 350 levels for 1,000 Coins each and replay any
+   unlocked level; unlocking does not change the original run objective. There
+   are 10 play attempts per local day, and restarting uses another attempt.
+   Level unlocks and Coin balances are browser-local and are not server-verified.
 6. Withdrawals reserve the requested balance immediately. Admins approve the
    request, send the payout manually to the submitted account, then mark it
    paid. Rejecting a request or a user's cancellation returns the reserved
