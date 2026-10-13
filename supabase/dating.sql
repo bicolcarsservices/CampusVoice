@@ -404,3 +404,5 @@ begin
 exception when others then
   raise notice 'Dating storage setup skipped: %', sqlerrm;
 end $$;
+
+notify pgrst, 'reload schema';

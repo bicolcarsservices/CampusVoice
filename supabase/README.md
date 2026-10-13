@@ -17,6 +17,15 @@ the profile, and names matching an existing school are also linked to that
 school for feed filters and counts. Review the SQL output for errors before
 using updated features.
 
+## Dating, messages, and online presence
+
+After `supabase/schema.sql`, run `supabase/dating.sql` in the Supabase SQL
+Editor. This creates the presence, friendship, profile-photo, and direct-message
+tables and the database functions used by Dating & Messages. The migration also
+requests a PostgREST schema-cache reload. If the app reports that
+`public.friendships` is missing, this migration has not been applied to the
+configured Supabase project; run it before opening `/dating`.
+
 ## One-time 2-day subscription trial
 
 After `supabase/schema.sql`, run `supabase/subscription-trials.sql` in the
