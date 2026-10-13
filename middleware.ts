@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/wall/new", "/profile", "/subscription", "/admin"];
+const PROTECTED = ["/wall/new", "/profile", "/subscription", "/admin", "/dating", "/messages"];
 
 function hasSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();

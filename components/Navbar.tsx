@@ -1,6 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createClient, getAuthUser, hasSupabaseConfig } from "@/lib/supabase/server";
 import PublicNavbar from "@/components/PublicNavbar";
+import PresenceHeartbeat from "@/components/social/PresenceHeartbeat";
 
 export default async function Navbar() {
   let user: User | null = null;
@@ -16,5 +17,10 @@ export default async function Navbar() {
     }
   }
 
-  return <PublicNavbar signedIn={Boolean(user)} isAdmin={isAdmin} />;
+  return (
+    <>
+      {user && <PresenceHeartbeat />}
+      <PublicNavbar signedIn={Boolean(user)} isAdmin={isAdmin} />
+    </>
+  );
 }

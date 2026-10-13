@@ -59,6 +59,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .btn-ghost:hover { border-color: #b6a4ec; background: #faf9ff; }
 .btn-primary:disabled, .btn-ghost:disabled { cursor: wait; opacity: .65; transform: none; }
 .text-brand { color: var(--brand); }
+.bg-brand { background: var(--brand); }
+.chat-bubble {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 18px;
+  padding: .7rem .9rem;
+  font-size: .95rem;
+  text-align: left;
+}
+.chat-bubble-mine { background: #6d3de3; color: #fff; border-bottom-right-radius: 6px; }
+.chat-bubble-theirs { background: #fff; border: 1px solid #e8e6ef; border-bottom-left-radius: 6px; }
+.chat-bubble-unsent { background: transparent; border: 1px dashed #c5c1d3; color: #6b657a; }
 .eyebrow { margin-bottom: .35rem; color: var(--brand); font-size: .76rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
 .tag { border-radius: 999px; background: #f0ebff; padding: .3rem .65rem; color: #5a36b7; font-size: .74rem; font-weight: 700; white-space: nowrap; }
 .avatar-fallback {
@@ -130,6 +142,20 @@ summary { list-style-position: inside; }
 }
 .public-nav-highlight { color: var(--brand); }
 .public-nav-admin { color: #5b34c4; font-weight: 750; }
+.online-count {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  color: #0f766e;
+  font-weight: 700;
+}
+.online-count-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.16);
+}
 .games-menu { position: relative; flex: 0 0 auto; }
 .games-menu summary { list-style: none; cursor: pointer; }
 .games-menu summary::-webkit-details-marker { display: none; }
@@ -167,6 +193,7 @@ summary { list-style-position: inside; }
   .public-nav-links.public-nav-links-open { border-color: #2c2938; }
   .public-nav-button:hover, .public-nav-button:focus-visible { border-color: #3b3748; background: #242130; color: #d4c6ff; }
   .public-nav-admin { color: #d4c6ff; }
+  .online-count { color: #6ee7b7; }
   .games-menu-panel { border-color: #3b3748; background: #191823; }
   .games-menu-item:hover, .games-menu-item:focus-visible { background: #242130; color: #d4c6ff; }
   .text-slate-500, .text-slate-600 { color: #b6b2c4; }

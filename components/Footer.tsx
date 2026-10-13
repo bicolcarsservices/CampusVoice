@@ -21,6 +21,7 @@ export default function Footer() {
           <h2 className="text-sm font-bold uppercase tracking-wide text-white">Explore</h2>
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/wall">Freedom Wall</Link></li>
+            <li><Link href="/dating">Dating &amp; Messages</Link></li>
             <li><Link href="/schools">Schools</Link></li>
             <li><Link href="/games">Games</Link></li>
             <li><Link href="/games/campus-coin-rush">Campus Coin Rush</Link></li>

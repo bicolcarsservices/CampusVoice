@@ -53,6 +53,7 @@ export default function PublicNavbar({
           <Link href="/wall" className="public-nav-button" onClick={() => setMenuOpen(false)}>Freedom Wall</Link>
           <Link href="/schools" className="public-nav-button" onClick={() => setMenuOpen(false)}>Schools</Link>
           {signedIn && <Link href="/wall/new" className="public-nav-button public-nav-highlight" onClick={() => setMenuOpen(false)}>Create Post</Link>}
+          {signedIn && <Link href="/dating" className="public-nav-button" onClick={() => setMenuOpen(false)}>Dating &amp; Messages</Link>}
           <Link href="/games" className="public-nav-button" onClick={() => setMenuOpen(false)}>Games</Link>
           <Link href="/subscription" className="public-nav-button" onClick={() => setMenuOpen(false)}>Plans</Link>
           {signedIn && (

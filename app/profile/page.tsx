@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import ProfileForm from "@/components/community/ProfileForm";
 import DeletePostForm from "@/components/community/DeletePostForm";
+import ProfilePhotoComposer from "@/components/social/ProfilePhotoComposer";
+import SocialActionForm from "@/components/social/SocialActionForm";
+import { deleteProfilePhoto } from "@/server/dating-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +14,21 @@ export default async function ProfilePage() {
 
   const [{ data: profile, error: profileError }, { data: schools, error: schoolsError },
     { data: posts, error: postsError }, { data: quota, error: quotaError },
-    { data: subscription, error: subscriptionError }] = await Promise.all([
+    { data: subscription, error: subscriptionError }, { data: photos, error: photosError }] = await Promise.all([
     supabase.from("profiles").select("id,username,display_name,school_id,school_name,grade_level,bio,avatar_path,created_at,status")
       .eq("id", user.id).maybeSingle(),
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
     supabase.from("my_posts").select("id,content,status,is_anonymous,created_at").order("created_at", { ascending: false }).limit(10),
     supabase.rpc("my_post_quota"),
     supabase.rpc("my_subscription"),
+    supabase.from("profile_photos").select("id,image_path,caption,created_at").eq("user_id", user.id).order("created_at", { ascending: false }),
   ]);
   if (profileError) throw new Error(`Could not load profile: ${profileError.message}`);
   if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);
   if (postsError) throw new Error(`Could not load your posts: ${postsError.message}`);
   if (quotaError) throw new Error(`Could not load posting allowance: ${quotaError.message}`);
   if (subscriptionError) throw new Error(`Could not load subscription: ${subscriptionError.message}`);
+  if (photosError) throw new Error(`Could not load profile photos: ${photosError.message}`);
   if (!profile) throw new Error("Your profile was not found. Please contact support.");
 
   const schoolName = profile.school_name ?? schools?.find((school) => school.id === profile.school_id)?.name ?? "No school selected";
@@ -62,6 +67,25 @@ export default async function ProfilePage() {
           {subscription?.expires_at && <p className="mt-1 text-sm text-slate-500">Expires {new Date(subscription.expires_at).toLocaleDateString()}</p>}
           <a href="/subscription" className="btn-ghost mt-4">View plans</a>
         </article>
+
+        <ProfilePhotoComposer />
+
+        {(photos ?? []).length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(photos ?? []).map((photo) => {
+              const url = supabase.storage.from("profile-photos").getPublicUrl(photo.image_path).data.publicUrl;
+              return (
+                <figure key={photo.id} className="card space-y-3 p-3">
+                  <img src={url} alt={photo.caption || ""} className="aspect-square w-full rounded-xl object-cover" />
+                  {photo.caption && <figcaption className="text-sm">{photo.caption}</figcaption>}
+                  <SocialActionForm action={deleteProfilePhoto} submitLabel="Remove photo">
+                    <input type="hidden" name="photo_id" value={photo.id} />
+                  </SocialActionForm>
+                </figure>
+              );
+            })}
+          </div>
+        )}
 
         <ProfileForm
           profile={{

@@ -1,6 +1,7 @@
 import { createClient, getAuthUser, hasSupabaseConfig } from "@/lib/supabase/server";
 import Link from "next/link";
 import PostCard from "@/components/community/PostCard";
+import { getOnlineNowCount } from "@/lib/presence";
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +43,12 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
   if (categoryId) postsQuery = postsQuery.eq("category_id", categoryId);
 
   const [{ data: posts, error: postsError }, { data: schools, error: schoolsError },
-    { data: categories, error: categoriesError }, { user }] = await Promise.all([
+    { data: categories, error: categoriesError }, { user }, onlineCount] = await Promise.all([
     postsQuery,
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
     supabase.from("categories").select("id,name").eq("is_active", true).order("sort_order"),
     getAuthUser(supabase),
+    getOnlineNowCount(supabase),
   ]);
   if (postsError) throw new Error(`Could not load Freedom Wall posts: ${postsError.message}`);
   if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);
@@ -98,6 +100,10 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
         <div>
           <p className="eyebrow">Your community feed</p>
           <h1 className="text-3xl font-bold">Freedom Wall</h1>
+          <p className="online-count mt-1 text-sm" aria-label={`${onlineCount} users online`}>
+            <span className="online-count-dot" aria-hidden="true" />
+            {onlineCount} online
+          </p>
         </div>
         {canInteract && <Link href="/wall/new" className="btn-primary">Create post</Link>}
       </header>
