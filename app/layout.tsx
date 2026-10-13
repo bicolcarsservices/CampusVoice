@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   title: "CampusVoice",
   description: "Your Voice. Your Space. Your Story.",
   icons: { icon: "/campusvoice-logo.jpg" },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

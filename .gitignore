@@ -5,6 +5,7 @@ out/
 build/
 coverage/
 .vercel/
+services/campus-doodle/data/
 
 .env*
 !.env.example

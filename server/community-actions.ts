@@ -224,7 +224,7 @@ export async function startSubscriptionTrial(_: ActionState, formData: FormData)
     p_plan_code: planCode.data,
   });
   if (error) {
-    if (error.message.includes("TRIAL_ALREADY_USED")) return { error: "The one-time 2-day trial has already been used on this account." };
+    if (error.message.includes("TRIAL_ALREADY_USED")) return { error: "The one-time 7-day trial has already been used on this account." };
     if (error.message.includes("ACTIVE_SUBSCRIPTION_EXISTS")) return { error: "You already have an active subscription." };
     if (error.message.includes("PENDING_SUBSCRIPTION_EXISTS")) return { error: "Resolve your pending subscription request before starting a trial." };
     if (error.message.includes("INVALID_TRIAL_PLAN") || error.message.includes("PLAN_NOT_FOUND")) return { error: "That trial plan is unavailable." };
@@ -234,7 +234,7 @@ export async function startSubscriptionTrial(_: ActionState, formData: FormData)
   revalidatePath("/subscription");
   revalidatePath("/profile");
   revalidatePath("/games/galactic-striker");
-  return { success: `${planCode.data === "basic" ? "Basic" : "Premium"} 2-day trial started. No payment was taken; access ends automatically after 2 days.` };
+  return { success: `${planCode.data === "basic" ? "Basic" : "Premium"} 7-day trial started. No payment was taken; access ends automatically after 7 days.` };
 }
 
 export async function cancelMySubscription(_: ActionState, formData: FormData): Promise<ActionState> {

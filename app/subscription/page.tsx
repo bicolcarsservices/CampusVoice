@@ -36,7 +36,7 @@ export default async function SubscriptionPage({
       <header className="mx-auto max-w-2xl text-center">
         <p className="eyebrow">Plans that grow with your voice</p>
         <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Eligible accounts can choose one free 2-day Basic or Premium trial. After the trial, choose Get Plan to pay using Maya QR. Payments are verified manually; plans never renew automatically.</p>
+        <p className="mt-3 text-slate-600 dark:text-slate-300">Eligible accounts can choose one free 7-day Basic or Premium trial. Starting a trial is optional. It ends automatically; no payment is taken and it does not convert to a paid plan. After the trial, choose Get Plan if you want to pay using Maya QR. Payments are verified manually; plans never renew automatically.</p>
         {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
       {subscription?.status === "expired" && (
@@ -97,7 +97,7 @@ export default async function SubscriptionPage({
               {plan.code === "free" ? (
                 <Link href={user ? "/wall" : "/register"} className="btn-ghost w-full">{user ? "Continue with Free" : "Get started"}</Link>
               ) : user && trialActive && trial ? (
-                <TrialStatus text={`Your 2-day trial is active until ${new Date(trial.expires_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}.`} />
+                <TrialStatus text={`Your trial is active until ${new Date(trial.expires_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}.`} />
               ) : user && subscription?.status === "pending" ? (
                 <TrialStatus text="Resolve your pending subscription request before starting a trial." />
               ) : user && !trialError && !trial && !hasActiveSubscription && (plan.code === "basic" || plan.code === "premium") ? (

@@ -26,15 +26,17 @@ requests a PostgREST schema-cache reload. If the app reports that
 `public.friendships` is missing, this migration has not been applied to the
 configured Supabase project; run it before opening `/dating`.
 
-## One-time 2-day subscription trial
+## One-time 7-day subscription trial
 
 After `supabase/schema.sql`, run `supabase/subscription-trials.sql` in the
 Supabase SQL Editor. This adds the private trial-use record and the
 `start_subscription_trial` database function used by the Plans page. A signed-in
-account can select one Basic or Premium trial lasting exactly 2 days; the
+account can optionally select one Basic or Premium trial lasting exactly 7 days; the
 database enforces one trial per account and blocks starting while an active or
-pending subscription exists. Trials expire without an automatic payment. After
-the trial has been used, the plan cards show **Get Plan** for a paid subscription.
+pending subscription exists. Trials expire without an automatic payment or
+conversion to a paid plan. Re-running the updated migration preserves any
+existing 2-day trial records while new trials last 7 days. After the trial has
+been used, the plan cards show **Get Plan** for a paid subscription.
 If the migration has not been applied, the Plans page will report that setup is
 needed rather than silently treating the user as trial-eligible.
 

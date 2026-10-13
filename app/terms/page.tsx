@@ -21,7 +21,7 @@ export default function TermsPage() {
       </section>
       <section>
         <h2 className="text-xl font-bold">Plans and trials</h2>
-        <p>Plan features, prices, and durations are shown on the Plans page and may change for future purchases. Unless explicitly stated otherwise, plans do not renew automatically. A payment request is not an active subscription until payment has been reviewed and confirmed. Eligible accounts may start one free 2-day Basic or Premium trial. A trial ends automatically and does not automatically charge or convert into a paid plan. Account eligibility and trial use are enforced by CampusVoice records.</p>
+        <p>Plan features, prices, and durations are shown on the Plans page and may change for future purchases. Unless explicitly stated otherwise, plans do not renew automatically. A payment request is not an active subscription until payment has been reviewed and confirmed. Eligible accounts may optionally start one free 7-day Basic or Premium trial. A trial ends automatically and does not automatically charge or convert into a paid plan. Account eligibility and trial use are enforced by CampusVoice records.</p>
       </section>
       <section>
         <h2 className="text-xl font-bold">Wallet, games, and rewards</h2>

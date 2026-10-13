@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "game:doodle": "node services/campus-doodle/dev.js",
+    "game:doodle:test": "npm --prefix services/campus-doodle test"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

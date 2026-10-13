@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Doodle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Caveat+Brush&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <button class="brand" id="brand" aria-label="Campus Doodle home">Campus Doodle</button>
+  <nav class="nav" aria-label="Main">
+    <button data-view="home" class="active">Play</button>
+    <button data-view="practice">Practice vs AI</button>
+    <button data-view="board">Leaderboard</button>
+    <button data-view="shop">Shop</button>
+    <button data-view="inventory">Inventory</button>
+    <button data-view="history">History</button>
+  </nav>
+  <div class="status">
+    <span class="dot" id="dot" title="Connection"></span>
+    <span class="coins" id="coins" title="Your Coins">0 Coins</span>
+  </div>
+</header>
+<div id="banner" class="banner" role="status" hidden>Reconnecting…</div>
+
+<main>
+  <section id="v-home" class="view">
+    <div class="hero card">
+      <h1>Draw it. Guess it. Win Coins.</h1>
+      <p class="muted">Play with friends in a private room, or practice solo against AI. Multiplayer matches can earn Coins.</p>
+      <label class="field">Your name
+        <input id="name" maxlength="16" autocomplete="off" placeholder="2–16 letters or numbers">
+      </label>
+      <div class="split">
+        <div class="panel">
+          <h2>Create a room</h2>
+          <label class="field">Rounds
+            <select id="cfg-rounds"></select>
+          </label>
+          <label class="field">Drawing time
+            <select id="cfg-time"></select>
+          </label>
+          <button class="btn primary" id="create">Create room</button>
+        </div>
+        <div class="panel">
+          <h2>Join with a code</h2>
+          <label class="field">Room code
+            <input id="code" maxlength="5" autocomplete="off" placeholder="ABCDE" class="code-input">
+          </label>
+          <button class="btn" id="join">Join room</button>
+        </div>
+      </div>
+      <p class="muted small" id="reward-note"></p>
+    </div>
+  </section>
+
+  <section id="v-practice" class="view" hidden>
+    <div class="hero card practice-card">
+      <p class="eyebrow">Solo practice · Free local AI</p>
+      <h1>Practice with AI</h1>
+      <p class="muted">Take turns drawing and guessing. Each round has one AI drawing for you to guess and one drawing from you for AI to guess. One word per drawing turn.</p>
+      <p class="muted small">Choose 1–6 rounds and a timer for each drawing turn. AI runs locally through Ollama, so there is no API key or per-request fee. Ollama and its vision model must be installed on the same computer as the game service. Practice does not earn multiplayer Coins.</p>
+      <div id="practice-setup" class="panel practice-setup">
+        <label class="field">Rounds
+          <select id="practice-rounds"></select>
+        </label>
+        <label class="field">Time per turn
+          <select id="practice-time"></select>
+        </label>
+        <button class="btn primary" id="practice-start">Start practice</button>
+        <p class="muted small" id="practice-error" role="alert"></p>
+      </div>
+      <div id="practice-game" hidden>
+        <div class="bar card">
+          <span id="practice-round-label" class="pill"></span>
+          <span id="practice-status" class="muted" aria-live="polite"></span>
+          <span id="practice-timer" class="pill timer" role="timer" aria-label="Time remaining" aria-live="off">–</span>
+          <span id="practice-score" class="pill">0 correct</span>
+        </div>
+        <p id="practice-prompt" class="practice-prompt" aria-live="polite"></p>
+        <div id="practice-choices" class="choices practice-choices"></div>
+        <form id="practice-guess-form" class="practice-guess" hidden>
+          <label class="field">Type your guess
+            <input id="practice-guess" maxlength="50" autocomplete="off" placeholder="Enter your guess">
+          </label>
+          <button class="btn primary" type="submit">Submit guess</button>
+        </form>
+        <div class="board-wrap practice-board">
+          <canvas id="practice-canvas" width="800" height="500" aria-label="Practice drawing canvas"></canvas>
+        </div>
+        <div id="practice-tools" class="tools card" hidden>
+          <div class="swatches" id="practice-swatches" role="radiogroup" aria-label="Practice drawing colour"></div>
+          <div class="sizes" id="practice-sizes" role="radiogroup" aria-label="Practice brush size"></div>
+          <button class="btn small" id="practice-eraser" aria-pressed="false">Eraser</button>
+          <button class="btn small" id="practice-clear">Clear</button>
+          <button class="btn primary" id="practice-submit">Ask AI to guess</button>
+        </div>
+        <div id="practice-result" class="practice-result" role="status" aria-live="polite"></div>
+        <button class="btn primary" id="practice-next" hidden>Continue</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="v-room" class="view" hidden>
+    <div class="game">
+      <aside class="players card" aria-label="Players"><ul id="plist"></ul></aside>
+      <div class="stage">
+        <div class="bar card">
+          <span id="round" class="pill">Lobby</span>
+          <span id="hint" class="hint" aria-live="polite"></span>
+          <span id="timer" class="pill timer">–</span>
+        </div>
+        <div class="board-wrap" id="boardwrap">
+          <canvas id="cv" width="800" height="500" aria-label="Drawing canvas"></canvas>
+          <div id="overlay" class="overlay" hidden></div>
+        </div>
+        <div class="tools card" id="tools" hidden>
+          <div class="swatches" id="swatches" role="radiogroup" aria-label="Colour"></div>
+          <div class="sizes" id="sizes" role="radiogroup" aria-label="Brush size"></div>
+          <button class="btn small" id="eraser" aria-pressed="false">Eraser</button>
+          <button class="btn small" id="clear">Clear</button>
+        </div>
+      </div>
+      <aside class="chat card" aria-label="Chat">
+        <div class="log" id="log" role="log" aria-live="polite"></div>
+        <form id="chatform" autocomplete="off">
+          <input id="chatin" maxlength="60" placeholder="Type your guess" aria-label="Guess or chat message">
+          <button class="btn primary small">Send</button>
+        </form>
+      </aside>
+    </div>
+  </section>
+
+  <section id="v-board" class="view" hidden>
+    <div class="card wide">
+      <h1>Leaderboard</h1>
+      <div class="tabs" id="boardtabs" role="tablist">
+        <button data-b="weekly" class="active">This week</button>
+        <button data-b="monthly">This month</button>
+        <button data-b="alltime">All time</button>
+        <button data-b="wins">Most wins</button>
+        <button data-b="score">Top score</button>
+      </div>
+      <p class="muted small">Coins here are earned from validated matches. They are separate from your current balance, which drops when you shop.</p>
+      <div id="boardbody"></div>
+      <div class="pager"><button class="btn small" id="bprev">Previous</button><span id="bpage"></span><button class="btn small" id="bnext">Next</button></div>
+    </div>
+  </section>
+
+  <section id="v-shop" class="view" hidden>
+    <div class="card wide"><h1>Shop</h1><p class="muted">Cosmetics only. Nothing here changes how the game is scored.</p><div id="shopbody" class="items"></div></div>
+  </section>
+
+  <section id="v-inventory" class="view" hidden>
+    <div class="card wide"><h1>Inventory</h1><div id="invbody" class="items"></div></div>
+  </section>
+
+  <section id="v-history" class="view" hidden>
+    <div class="card wide"><h1>Match history</h1><div id="histbody"></div></div>
+  </section>
+</main>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>

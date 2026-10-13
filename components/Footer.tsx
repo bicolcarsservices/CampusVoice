@@ -24,6 +24,7 @@ export default function Footer() {
             <li><Link href="/dating">Dating &amp; Messages</Link></li>
             <li><Link href="/schools">Schools</Link></li>
             <li><Link href="/games">Games</Link></li>
+            <li><Link href="/games/campus-doodle">Campus Doodle · Free</Link></li>
             <li><Link href="/games/campus-coin-rush">Campus Coin Rush</Link></li>
             <li><Link href="/games/galactic-striker">Galactic Striker</Link></li>
             <li><Link href="/subscription">Plans</Link></li>
