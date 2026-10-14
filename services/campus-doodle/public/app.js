@@ -24,6 +24,20 @@ let boardView = 'weekly', boardPage = 1, pendingKeys = {};
 
 function toast(msg, bad) { const t = h('div', { class: 'toast' + (bad ? ' bad' : ''), text: msg }); $('#toasts').append(t); setTimeout(() => t.remove(), 3500); }
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+async function copy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Copied!');
+    return;
+  } catch (_) {
+    const field = h('input', { type: 'text', readonly: true, 'aria-label': 'Text to copy', value: text });
+    field.style.cssText = 'display:block;width:100%;margin-top:8px;padding:8px;border-radius:6px;user-select:all';
+    const message = h('div', { class: 'toast bad' }, 'Copy it manually with Ctrl+C or long-press:', field);
+    $('#toasts').append(message);
+    field.focus();
+    field.select();
+  }
+}
 
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
@@ -221,7 +235,6 @@ function renderOverlay() {
   ov.hidden = !show;
 }
 function leave() { send({ type: 'leave_room' }); }
-async function copy(text) { try { await navigator.clipboard.writeText(text); toast('Copied!'); } catch (_) { toast('Copy failed. Select and copy it manually.', true); } }
 
 /* timer */
 setInterval(() => {

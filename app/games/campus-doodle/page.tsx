@@ -44,7 +44,7 @@ export default function CampusDoodlePage() {
           title="Campus Doodle free multiplayer game"
           src={gameUrl}
           className="h-[82vh] min-h-[680px] w-full rounded-xl border border-slate-300 bg-slate-950 dark:border-slate-700"
-          allow="fullscreen"
+          allow="fullscreen; clipboard-write"
         />
       ) : (
         <aside role="status" className="card">
