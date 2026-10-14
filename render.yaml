@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: campus-doodle
+    runtime: node
+    plan: free
+    rootDir: services/campus-doodle
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production

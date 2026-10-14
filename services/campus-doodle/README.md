@@ -33,14 +33,19 @@ $env:OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 npm run game:doodle
 ```
 
-## Deploy
-Needs a separate host/service that keeps a Node process running (Render, Railway, Fly.io, or a VPS). **Vercel serverless will not work** for the WebSocket server.
-- Set the service root directory to `services/campus-doodle`, install with `npm install`, and use `npm start`.
-- Set `CAMPUS_DOODLE_URL` on the CampusVoice web app to the public HTTPS URL of this service.
-- Set `ALLOWED_ORIGINS` on this service to the exact CampusVoice web origin (for example `https://campusvoice.example.com`) so the game can be embedded and its WebSocket accepts the app origin.
-- Attach a persistent disk/volume and set `DATA_FILE=/path/db.json`; without it, Coins reset on redeploy.
-- Use HTTPS; the client switches to `wss://` automatically.
-- Runs as ONE instance (room state lives in memory).
+## Deploy publicly (Vercel + Render)
+The Next.js CampusVoice app can run on Vercel, but the multiplayer game needs a separate Node service with WebSocket support. The repository-root `render.yaml` configures a free Render web service for the game.
+
+1. Push the project, including `render.yaml`, to GitHub.
+2. Import the repository into Vercel and deploy CampusVoice from the repository root. Set the required Supabase environment variables from `.env.example`.
+3. In Render, create a new Blueprint from the same GitHub repository. Render reads `render.yaml` and deploys the `campus-doodle` service. Copy its public HTTPS URL (for example, `https://campus-doodle.onrender.com`).
+4. In Vercel project settings, add `CAMPUS_DOODLE_URL` with that Render URL, then redeploy the Vercel app.
+5. In the Render service's environment settings, set `ALLOWED_ORIGINS` to the exact public CampusVoice origin, such as `https://your-app.vercel.app` (no path or trailing slash). For a custom domain, include each origin as a comma-separated value, for example `https://your-app.vercel.app,https://campusvoice.example.com`. Save the change and redeploy/restart the game service.
+6. Open `https://your-app.vercel.app/games/campus-doodle` and test joining the same room from another device or browser.
+
+The included Blueprint uses Render's free plan: the service may spin down when idle, so the first visit after inactivity can take a while. Its filesystem is temporary, so player Coins and leaderboard data can reset when the service restarts or redeploys. For persistent data, use a paid Render plan with a persistent disk mounted at `/var/data` and set `DATA_FILE=/var/data/db.json`. Run only one game-service instance because live room state is held in memory.
+
+Online AI practice is separate from multiplayer and needs Ollama with a vision model running on the same host as the game service. It is not enabled by this basic deployment setup.
 
 ## Rules (all enforced on the server, see `config.js`)
 - States: WAITING -> STARTING -> DRAWING -> ROUND_RESULTS -> NEXT_ROUND -> MATCH_FINISHED. Everyone draws once per round.
