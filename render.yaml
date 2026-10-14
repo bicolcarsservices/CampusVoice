@@ -6,7 +6,9 @@ services:
     rootDir: services/campus-doodle
     buildCommand: npm ci
     startCommand: npm start
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
+      - key: ALLOWED_ORIGINS
+        value: https://campus-voice-pi.vercel.app

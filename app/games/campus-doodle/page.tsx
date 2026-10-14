@@ -4,7 +4,9 @@ export const dynamic = "force-dynamic";
 
 function getCampusDoodleUrl() {
   const configuredUrl = process.env.CAMPUS_DOODLE_URL?.trim();
-  const gameUrl = configuredUrl || (process.env.NODE_ENV === "production" ? "" : "http://localhost:3101");
+  const gameUrl = configuredUrl || (process.env.NODE_ENV === "production"
+    ? "https://campus-doodle.onrender.com"
+    : "http://localhost:3101");
   if (!gameUrl) return null;
 
   let parsedUrl: URL;

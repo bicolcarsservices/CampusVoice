@@ -39,9 +39,9 @@ The Next.js CampusVoice app can run on Vercel, but the multiplayer game needs a 
 1. Push the project, including `render.yaml`, to GitHub.
 2. Import the repository into Vercel and deploy CampusVoice from the repository root. Set the required Supabase environment variables from `.env.example`.
 3. In Render, create a new Blueprint from the same GitHub repository. Render reads `render.yaml` and deploys the `campus-doodle` service. Copy its public HTTPS URL (for example, `https://campus-doodle.onrender.com`).
-4. In Vercel project settings, add `CAMPUS_DOODLE_URL` with that Render URL, then redeploy the Vercel app.
-5. In the Render service's environment settings, set `ALLOWED_ORIGINS` to the exact public CampusVoice origin, such as `https://your-app.vercel.app` (no path or trailing slash). For a custom domain, include each origin as a comma-separated value, for example `https://your-app.vercel.app,https://campusvoice.example.com`. Save the change and redeploy/restart the game service.
-6. Open `https://your-app.vercel.app/games/campus-doodle` and test joining the same room from another device or browser.
+4. The CampusVoice game page defaults to `https://campus-doodle.onrender.com` in production. If the service URL changes, set `CAMPUS_DOODLE_URL` in Vercel to its public HTTPS URL, then redeploy the Vercel app.
+5. Set `ALLOWED_ORIGINS` on Render to the exact CampusVoice origin `https://campus-voice-pi.vercel.app` (no path or trailing slash). It is included in the repository-root `render.yaml`. For a custom domain, add its origin as a comma-separated value too. Save the setting and redeploy/restart the game service.
+6. Open `https://campus-voice-pi.vercel.app/games/campus-doodle` and test joining the same room from another device or browser.
 
 The included Blueprint uses Render's free plan: the service may spin down when idle, so the first visit after inactivity can take a while. Its filesystem is temporary, so player Coins and leaderboard data can reset when the service restarts or redeploys. For persistent data, use a paid Render plan with a persistent disk mounted at `/var/data` and set `DATA_FILE=/var/data/db.json`. Run only one game-service instance because live room state is held in memory.
 
