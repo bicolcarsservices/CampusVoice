@@ -21,6 +21,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  const isProtectedRoute = PROTECTED.some((path) =>
+    req.nextUrl.pathname === path || req.nextUrl.pathname.startsWith(`${path}/`)
+  );
+  if (!isProtectedRoute) {
+    return NextResponse.next();
+  }
+
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,7 +56,7 @@ export async function middleware(req: NextRequest) {
       throw error;
     }
   }
-  if (!user && PROTECTED.some((p) => req.nextUrl.pathname.startsWith(p))) {
+  if (!user) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

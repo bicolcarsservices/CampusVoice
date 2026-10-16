@@ -70,7 +70,7 @@ async function paymongo(path: string, attributes: Record<string, unknown>, stage
 
 export async function POST(request: Request) {
   const supabase = createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { user, error: authError } = await getAuthUser(supabase);
   if (authError) {
     console.error("GCash checkout authentication failed", authError);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });

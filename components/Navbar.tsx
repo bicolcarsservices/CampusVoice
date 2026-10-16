@@ -9,7 +9,8 @@ export default async function Navbar() {
   let isAdmin = false;
   if (hasSupabaseConfig()) {
     const supabase = createClient();
-    const { user: sessionUser } = await getAuthUser(supabase);
+    const { user: sessionUser, error } = await getAuthUser(supabase);
+    if (error) console.error("Could not verify the signed-in user for navigation.", error);
     user = sessionUser;
     if (user) {
       const { data: adminAccess, error: adminError } = await supabase.rpc("is_admin");
