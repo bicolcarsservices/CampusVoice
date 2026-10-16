@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/auth-actions";
 
-type NavigationIconName = "bell" | "user" | "messages" | "post" | "games" | "wallet";
+type NavigationIconName = "bell" | "user" | "messages" | "post" | "plus" | "games" | "wallet" | "support";
 
 function NavigationIcon({ name }: { name: NavigationIconName }) {
   const common = {
@@ -27,8 +27,12 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
       return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></svg>;
     case "messages":
       return <svg {...common}><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" /></svg>;
+    case "support":
+      return <svg {...common}><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H8l-4 2 1.2-4.2A7.5 7.5 0 1 1 20 11.5Z" /><path d="M9 10a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01" /></svg>;
     case "post":
       return <svg {...common}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M12 18v-6m-3 3h6" /></svg>;
+    case "plus":
+      return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>;
     case "games":
       return <svg {...common}><path d="M6 12h4m-2-2v4m8-1h.01M18 10h.01M7 6h10a4 4 0 0 1 3.9 3.1l1 4.5a2 2 0 0 1-3.3 1.9L16 13H8l-2.6 2.5a2 2 0 0 1-3.3-1.9l1-4.5A4 4 0 0 1 7 6z" /></svg>;
     case "wallet":
@@ -52,14 +56,15 @@ export default function PublicNavbar({
 
   const bottomLinks: { href: string; label: string; icon: NavigationIconName; active: boolean }[] = [
     { href: "/dating", label: "Dating & Messages", icon: "messages", active: isActivePath(pathname, "/dating") || isActivePath(pathname, "/messages") },
-    { href: "/wall/new", label: "Create Post", icon: "post", active: isActivePath(pathname, "/wall/new") },
     { href: "/games", label: "Games", icon: "games", active: isActivePath(pathname, "/games") },
+    { href: "/wall/new", label: "Create Post", icon: "plus", active: isActivePath(pathname, "/wall/new") },
     { href: "/wallet", label: "Wallet", icon: "wallet", active: isActivePath(pathname, "/wallet") },
+    { href: "/profile", label: "Profile & Settings", icon: "user", active: isActivePath(pathname, "/profile") },
   ];
 
   return (
     <>
-      <header className="site-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+      <header className="site-header z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <nav aria-label="Main navigation" className="public-navigation mx-auto max-w-7xl px-4 py-2">
           <Link href="/" className="public-brand" aria-label="CampusVoice home">
             <Image
@@ -88,15 +93,6 @@ export default function PublicNavbar({
                   className={`public-nav-icon${isActivePath(pathname, "/notifications") ? " public-nav-active" : ""}`}
                 >
                   <NavigationIcon name="bell" />
-                </Link>
-                <Link
-                  href="/profile"
-                  aria-label="Profile"
-                  aria-current={isActivePath(pathname, "/profile") ? "page" : undefined}
-                  title="Profile"
-                  className={`public-nav-icon${isActivePath(pathname, "/profile") ? " public-nav-active" : ""}`}
-                >
-                  <NavigationIcon name="user" />
                 </Link>
                 {isAdmin && (
                   <Link
@@ -130,13 +126,23 @@ export default function PublicNavbar({
                 aria-label={label}
                 aria-current={active ? "page" : undefined}
                 title={label}
-                className={`bottom-navigation-link${active ? " bottom-navigation-link-active" : ""}`}
+                className={`bottom-navigation-link${label === "Create Post" ? " bottom-navigation-link-create" : ""}${active ? " bottom-navigation-link-active" : ""}`}
               >
                 <NavigationIcon name={icon} />
               </Link>
             ))}
           </div>
         </nav>
+      )}
+      {signedIn && (
+        <Link
+          href="/support"
+          className={`support-launcher${isActivePath(pathname, "/support") ? " support-launcher-active" : ""}`}
+          aria-label="CampusVoice Support chat"
+          title="CampusVoice Support"
+        >
+          <NavigationIcon name="support" />
+        </Link>
       )}
     </>
   );

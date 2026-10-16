@@ -4,6 +4,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import SocialActionForm from "@/components/social/SocialActionForm";
 import { respondFriendRequest, sendFriendRequest } from "@/server/dating-actions";
 import { isCurrentlyOnline } from "@/lib/social";
+import NewGroupChatForm from "@/components/social/NewGroupChatForm";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +18,19 @@ export default async function DatingPage() {
     { data: presence },
     { data: friendships, error: friendsError },
     { data: conversations, error: conversationsError },
+    { data: groupConversations, error: groupConversationsError },
   ] = await Promise.all([
     supabase.from("public_profiles").select("id,username,display_name,school_name,bio,avatar_path").neq("id", userId).order("display_name"),
     supabase.from("user_presence").select("user_id,last_seen_at"),
     supabase.from("friendships").select("id,requester_id,addressee_id,status").or(`requester_id.eq.${userId},addressee_id.eq.${userId}`),
     supabase.rpc("my_conversations"),
+    supabase.rpc("my_group_chats"),
   ]);
   if (profilesError) throw new Error(`Could not load dating profiles: ${profilesError.message}`);
   if (friendsError) throw new Error(`Could not load friends: ${friendsError.message}`);
   if (conversationsError) throw new Error(`Could not load messages: ${conversationsError.message}`);
+  const groupChatNeedsSetup = groupConversationsError?.code === "PGRST202" || groupConversationsError?.code === "42883";
+  if (groupConversationsError && !groupChatNeedsSetup) throw new Error(`Could not load group messages: ${groupConversationsError.message}`);
 
   const presenceByUser = new Map((presence ?? []).map((row) => [row.user_id, row.last_seen_at]));
   const incoming = (friendships ?? []).filter((row) => row.addressee_id === userId && row.status === "pending");
@@ -40,6 +45,8 @@ export default async function DatingPage() {
     unread_count: number | null;
   };
   const threads = (conversations ?? []) as Conversation[];
+  type GroupConversation = { group_id: string; name: string; created_at: string; last_body: string | null; last_at: string | null; member_count: number };
+  const groupThreads = (groupConversations ?? []) as GroupConversation[];
   const onlineProfiles = (profiles ?? []).filter((profile) => isCurrentlyOnline(presenceByUser.get(profile.id)));
 
   function relation(otherId: string) {
@@ -55,38 +62,80 @@ export default async function DatingPage() {
   }
 
   return (
-    <section className="mx-auto max-w-4xl space-y-6">
+    <section className="mx-auto max-w-6xl space-y-6">
       <header>
         <p className="eyebrow">Meet people</p>
         <h1 className="text-3xl font-extrabold">Dating &amp; Messages</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">Find people, see who is online, and continue your conversations in one place. Photos posted here stay on their profile, not the Freedom Wall.</p>
       </header>
 
-      <section id="messages" className="scroll-mt-24 space-y-3">
-        <h2 className="text-xl font-bold">Messages</h2>
-        {!threads.length && <p className="card text-slate-500">No conversations yet. Open a profile and tap Message to start a chat.</p>}
-        {threads.map((thread) => {
-          const avatarUrl = thread.avatar_path
-            ? supabase.storage.from("avatars").getPublicUrl(thread.avatar_path).data.publicUrl
-            : null;
-          const preview = thread.last_unsent
-            ? "This message was unsent"
-            : thread.last_body || (thread.last_image ? "Photo" : "Message");
-          return (
-            <Link key={thread.other_user_id} href={`/messages/${thread.other_user_id}`} className="card flex items-center gap-3 hover:border-violet-300">
-              {avatarUrl
-                ? <img src={avatarUrl} alt="" className="avatar-fallback h-12 w-12 object-cover" />
-                : <div className="avatar-fallback h-12 w-12">{String(thread.display_name ?? "?").slice(0, 1).toUpperCase()}</div>}
-              <div className="min-w-0 flex-1">
-                <p className="font-bold">{thread.display_name} <span className="font-normal text-slate-500">@{thread.username}</span></p>
-                <p className="truncate text-sm text-slate-500">{preview}</p>
-              </div>
-              {Number(thread.unread_count) > 0 && (
-                <span className="rounded-full bg-brand px-2 py-1 text-xs font-bold text-white">{Number(thread.unread_count)}</span>
-              )}
+      <section id="messages" className="messenger-layout scroll-mt-24">
+        <aside className="messenger-sidebar">
+          <div className="messenger-sidebar-heading">
+            <div>
+              <p className="eyebrow">Inbox</p>
+              <h2 className="text-xl font-extrabold">Messages</h2>
+            </div>
+            <Link href="#new-group-chat" className="messenger-new-chat" aria-label="Create a group chat" title="Create group chat">＋</Link>
+          </div>
+          {groupChatNeedsSetup && (
+            <p className="m-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950">
+              Group chats need a one-time database setup. Run <code>supabase/messaging-enhancements.sql</code> in Supabase SQL Editor.
+            </p>
+          )}
+          {!threads.length && !groupThreads.length && <p className="p-4 text-sm text-slate-500">No conversations yet. Start a message from a campus profile.</p>}
+          {groupThreads.map((thread) => (
+            <Link key={thread.group_id} href={`/messages/group/${thread.group_id}`} className="messenger-conversation">
+              <span className="messenger-group-avatar" aria-hidden="true">✦</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-bold">{thread.name}</span>
+                <span className="block truncate text-sm text-slate-500">{thread.last_body || `${thread.member_count} members`}</span>
+              </span>
             </Link>
-          );
-        })}
+          ))}
+          {threads.map((thread) => {
+            const avatarUrl = thread.avatar_path
+              ? supabase.storage.from("avatars").getPublicUrl(thread.avatar_path).data.publicUrl
+              : null;
+            const preview = thread.last_unsent
+              ? "This message was unsent"
+              : thread.last_body || (thread.last_image ? "Photo" : "Message");
+            return (
+              <Link key={thread.other_user_id} href={`/messages/${thread.other_user_id}`} className="messenger-conversation">
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="" className="avatar-fallback h-12 w-12 object-cover" />
+                  : <span className="avatar-fallback h-12 w-12">{String(thread.display_name ?? "?").slice(0, 1).toUpperCase()}</span>}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold">{thread.display_name} <span className="font-normal text-slate-500">@{thread.username}</span></span>
+                  <span className="block truncate text-sm text-slate-500">{preview}</span>
+                </span>
+                {Number(thread.unread_count) > 0 && (
+                  <span className="rounded-full bg-brand px-2 py-1 text-xs font-bold text-white">{Number(thread.unread_count)}</span>
+                )}
+              </Link>
+            );
+          })}
+        </aside>
+        <div className="messenger-home-panel">
+          <div className="messenger-empty-state">
+            <span className="messenger-empty-icon" aria-hidden="true">✉</span>
+            <h3 className="text-xl font-bold">Your campus conversations</h3>
+            <p className="max-w-md text-sm text-slate-500">Choose a conversation, start a private message from a profile, or create a group for your campus community.</p>
+            <Link href="#online-users" className="btn-ghost">Find people</Link>
+          </div>
+          <details id="new-group-chat" className="messenger-group-create">
+            <summary>Create a group chat</summary>
+            {groupChatNeedsSetup ? (
+              <p className="mt-3 text-sm text-slate-500">Run the messaging database migration above to enable groups.</p>
+            ) : (
+              <NewGroupChatForm profiles={(profiles ?? []).map((profile) => ({
+                id: profile.id,
+                username: profile.username,
+                display_name: profile.display_name,
+              }))} />
+            )}
+          </details>
+        </div>
       </section>
 
       <section id="online-users" className="scroll-mt-24 space-y-3">

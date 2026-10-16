@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
+import AdminNavigation from "@/components/admin/AdminNavigation";
 
 export const dynamic = "force-dynamic";
 
@@ -28,16 +29,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="eyebrow">Private workspace</p><h1 className="text-3xl font-extrabold">Admin dashboard</h1></div>
-          <Link href="/" className="btn-ghost">View public site</Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/support" className="btn-ghost">Support inbox</Link>
+            <Link href="/" className="btn-ghost">View public site</Link>
+          </div>
         </div>
-        <nav aria-label="Admin navigation" className="flex flex-wrap gap-2 border-b border-slate-200 pb-3 text-sm dark:border-slate-800">
-          {[["Overview", "/admin"], ["Posts", "/admin/posts"], ["Comments", "/admin/comments"], ["Reports", "/admin/reports"], ["Users", "/admin/users"],
-            ["Subscriptions", "/admin/subscriptions"], ["Wallet", "/admin/wallet"], ["Game rewards", "/admin/game-rewards"], ["Galactic Striker", "/admin/galactic-striker"], ["Plans", "/admin/plans"], ["Settings", "/admin/settings"],
-            ["Announcements", "/admin/announcements"], ["Schools", "/admin/schools"],
-            ["Categories", "/admin/categories"]].map(([label, href]) => (
-            <Link className="rounded-lg px-3 py-2 font-medium hover:bg-violet-50 hover:text-brand dark:hover:bg-slate-800" href={href} key={href}>{label}</Link>
-          ))}
-        </nav>
+        <AdminNavigation />
       </header>
       {children}
     </div>

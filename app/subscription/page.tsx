@@ -9,19 +9,22 @@ export const dynamic = "force-dynamic";
 
 export default async function SubscriptionPage({
   searchParams,
+  compact = false,
 }: {
   searchParams?: { intent_id?: string | string[] };
+  compact?: boolean;
 }) {
   const supabase = createClient();
-  const [{ data: plans, error: plansError }, { data: features, error: featuresError },
-    { user }, { data: subscription, error: subscriptionError }] = await Promise.all([
+  const [{ data: plans, error: plansError }, { data: features, error: featuresError }, { user }] = await Promise.all([
     supabase.from("subscription_plans")
       .select("id,code,name,description,price_php,duration_days,daily_post_limit,badge_label,is_active,sort_order")
       .eq("is_active", true).order("sort_order"),
     supabase.from("subscription_features").select("plan_id,label,feature_key,sort_order").order("sort_order"),
     getAuthUser(supabase),
-    supabase.rpc("my_subscription"),
   ]);
+  const { data: subscription, error: subscriptionError } = user
+    ? await supabase.rpc("my_subscription")
+    : { data: null, error: null };
   if (plansError) throw new Error(`Could not load subscription plans: ${plansError.message}`);
   if (featuresError) throw new Error(`Could not load plan features: ${featuresError.message}`);
   if (subscriptionError) throw new Error(`Could not load subscription status: ${subscriptionError.message}`);
@@ -32,26 +35,26 @@ export default async function SubscriptionPage({
   const hasActiveSubscription = subscription?.status === "basic" || subscription?.status === "premium";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <header className="mx-auto max-w-2xl text-center">
+    <div className={`subscription-plan-picker mx-auto max-w-6xl ${compact ? "subscription-plan-picker-compact" : "space-y-8"}`}>
+      <header className={`mx-auto text-center ${compact ? "max-w-3xl" : "max-w-2xl"}`}>
         <p className="eyebrow">Plans that grow with your voice</p>
-        <h1 className="text-4xl font-extrabold">Choose your CampusVoice plan</h1>
-        <p className="mt-3 text-slate-600 dark:text-slate-300">Eligible accounts can choose one free 7-day Basic or Premium trial. Starting a trial is optional. It ends automatically; no payment is taken and it does not convert to a paid plan. After the trial, choose Get Plan if you want to pay using Maya QR. Payments are verified manually; plans never renew automatically.</p>
-        {user && <p className="mt-4 text-sm">Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
+        <h1 className={compact ? "text-3xl font-extrabold" : "text-4xl font-extrabold"}>Choose your CampusVoice plan</h1>
+        {!compact && <p className="subscription-plan-explainer mt-3 text-slate-600 dark:text-slate-300">Eligible accounts may start one optional 7-day Basic or Premium trial. No payment or automatic charge. Paid plans use Maya QR and are activated after manual payment verification; plans do not renew automatically.</p>}
+        {user && <p className={compact ? "mt-2 text-xs text-slate-500" : "mt-4 text-sm"}>Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>
-      {subscription?.status === "expired" && (
+      {!compact && subscription?.status === "expired" && (
         <aside className="card border-amber-300 bg-amber-50 text-amber-950">
           <h2 className="font-bold">Your subscription has expired</h2>
           <p className="mt-1 text-sm">Choose a plan below to subscribe again. You will review and complete a new payment.</p>
         </aside>
       )}
-      {subscription?.status === "cancelled" && (
+      {!compact && subscription?.status === "cancelled" && (
         <aside className="card">
           <h2 className="font-bold">Your subscription is cancelled</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below whenever you are ready to subscribe again.</p>
         </aside>
       )}
-      {subscription?.status === "refunded" && (
+      {!compact && subscription?.status === "refunded" && (
         <aside className="card">
           <h2 className="font-bold">Your subscription payment was refunded</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below to start a new subscription.</p>
@@ -69,31 +72,28 @@ export default async function SubscriptionPage({
           <PaymongoStatusSync intentId={searchParams.intent_id} autoSync />
         </aside>
       )}
-      {subscription?.subscription_id && (
-        <aside className="card">
-          <p className="text-sm text-slate-600 dark:text-slate-300">You may cancel your active plan at any time. Cancellation ends access immediately.</p>
-          <CancelSubscriptionForm subscriptionId={subscription.subscription_id} />
-        </aside>
-      )}
-      <div className="grid items-stretch gap-5 md:grid-cols-3">
+      <div className={`subscription-plan-grid grid items-stretch ${compact ? "grid-cols-3 gap-3" : "gap-5 md:grid-cols-3"}`}>
         {(plans ?? []).map((plan) => {
           const planFeatures = (features ?? []).filter((feature) => feature.plan_id === plan.id);
           const featured = plan.code === "premium";
           return (
-            <article key={plan.id} className={`card flex flex-col ${featured ? "border-violet-400 ring-2 ring-violet-100 dark:ring-violet-900" : ""}`}>
+            <article key={plan.id} className={`card flex flex-col ${compact ? "plan-picker-card" : "mobile-plan-picker-card"} ${featured ? "border-violet-400 ring-2 ring-violet-100 dark:ring-violet-900" : ""}`}>
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-2xl font-bold">{plan.name}</h2>
                 {plan.badge_label && <span className="tag">{plan.badge_label}</span>}
               </div>
-              <p className="mt-2 min-h-12 text-sm text-slate-600 dark:text-slate-300">{plan.description}</p>
-              <p className="mt-5 text-4xl font-extrabold">₱{Number(plan.price_php).toLocaleString("en-PH")}</p>
-              <p className="text-sm text-slate-500">{plan.duration_days ? `${plan.duration_days} days` : "No expiry"}</p>
-              <p className="mt-3 text-sm font-semibold">
-                {plan.daily_post_limit == null ? "Unlimited posts" : `${plan.daily_post_limit} posts per day`}
+              {!compact && <p className="mt-2 min-h-12 text-sm text-slate-600 dark:text-slate-300">{plan.description}</p>}
+              {compact && <p className="plan-picker-description mt-1 text-xs text-slate-500">{plan.description}</p>}
+              <p className={compact ? "mt-3 text-3xl font-extrabold" : "mt-5 text-4xl font-extrabold"}>₱{Number(plan.price_php).toLocaleString("en-PH")}</p>
+              <p className="text-sm text-slate-500">
+                {plan.duration_days ? `${plan.duration_days} ${plan.duration_days === 1 ? "day" : "days"}` : "No expiry"}
               </p>
-              <ul className="my-5 flex-1 space-y-2 text-sm">
+              {!compact && <p className="mt-3 text-sm font-semibold">
+                {plan.daily_post_limit == null ? "Unlimited posts" : `${plan.daily_post_limit} posts per day`}
+              </p>}
+              {!compact && <ul className="my-5 flex-1 space-y-2 text-sm">
                 {planFeatures.map((feature) => <li key={`${feature.plan_id}-${feature.sort_order}`} className="flex gap-2"><span className="text-brand">✓</span>{feature.label}</li>)}
-              </ul>
+              </ul>}
               {plan.code === "free" ? (
                 <Link href={user ? "/wall" : "/register"} className="btn-ghost w-full">{user ? "Continue with Free" : "Get started"}</Link>
               ) : user && trialActive && trial ? (
@@ -106,7 +106,11 @@ export default async function SubscriptionPage({
                 <PlanRequestForm
                   planId={plan.id}
                   planName={plan.name}
+                  description={plan.description}
                   pricePhp={Number(plan.price_php)}
+                  durationDays={plan.duration_days}
+                  dailyPostLimit={plan.daily_post_limit}
+                  features={planFeatures.map((feature) => feature.label)}
                 />
               ) : (
                 <Link href="/login" className="btn-primary w-full">Log in to request</Link>
@@ -115,7 +119,13 @@ export default async function SubscriptionPage({
           );
         })}
       </div>
-      <p className="text-center text-xs text-slate-500">Maya payments are verified manually by an administrator before a subscription is activated. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>
+      {!compact && subscription?.subscription_id && (
+        <aside className="card">
+          <p className="text-sm text-slate-600 dark:text-slate-300">You may cancel your active plan at any time. Cancellation ends access immediately.</p>
+          <CancelSubscriptionForm subscriptionId={subscription.subscription_id} />
+        </aside>
+      )}
+      {!compact && <p className="text-center text-xs text-slate-500">Maya payments are verified manually by an administrator before a subscription is activated. Plan prices and features can change; confirmed subscriptions follow their recorded terms.</p>}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // End-to-end tests: starts the real server in-process, plays real matches with WebSocket bots.
 // Run with: npm test   (uses short timers via TEST_FAST=1 and a throw-away data file)
 process.env.TEST_FAST = '1';
+process.env.ALLOWED_ORIGINS = 'http://localhost:3037';
 const os = require('os'), path = require('path'), fs = require('fs'), crypto = require('crypto'), assert = require('assert');
 process.env.DATA_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cd-')), 'db.json');
 const WebSocket = require('ws');
@@ -71,6 +72,12 @@ const ledger = () => _test.db.ledger;
 (async () => {
   const server = await start(0); port = server.address().port;
   console.log('Campus Doodle tests (port ' + port + ')');
+
+  await test('game page can be embedded by the configured CampusVoice origin', async () => {
+    const response = await nativeFetch(`http://localhost:${port}/`);
+    assert.strictEqual(response.status, 200);
+    assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'self' http:\/\/localhost:3037/);
+  });
 
   await test('practice has 1,000 unique words and reports when local Ollama is unavailable', async () => {
     const previousFetch = global.fetch;

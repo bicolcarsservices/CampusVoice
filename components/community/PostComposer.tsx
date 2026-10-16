@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createPost } from "@/server/community-actions";
+import EmojiPicker from "@/components/EmojiPicker";
 
 type Option = { id: string; name: string };
 
@@ -22,6 +24,7 @@ export default function PostComposer({
   schools: Option[];
 }) {
   const [state, action] = useFormState(createPost, null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   return (
     <form action={action} className="card space-y-4">
@@ -29,6 +32,7 @@ export default function PostComposer({
         What’s on your mind?
         <textarea
           name="content"
+          ref={contentRef}
           required
           minLength={1}
           maxLength={2000}
@@ -38,6 +42,7 @@ export default function PostComposer({
         />
         <span className="mt-1 block text-xs text-slate-500">Up to 2,000 characters.</span>
       </label>
+      <EmojiPicker inputRef={contentRef} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-medium">

@@ -293,6 +293,68 @@ export async function saveWebsiteSetting(formData: FormData) {
   return { success: "Setting saved." };
 }
 
+export async function saveBrandLogo(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+  const key = z.enum([
+    "auth_hero_logo",
+    "auth_form_logo",
+    "game_logo_campus_doodle",
+    "game_logo_campus_coin_rush",
+    "game_logo_galactic_striker",
+  ]).safeParse(formData.get("key"));
+  const candidate = formData.get("logo");
+  const file = typeof File !== "undefined" && candidate instanceof File && candidate.size > 0
+    ? candidate
+    : null;
+  if (!key.success || !file) return { error: "Choose a logo image to upload." };
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 2 * 1024 * 1024) {
+    return { error: "Use a JPG, PNG, or WebP image no larger than 2 MB." };
+  }
+
+  const bucket = key.data.startsWith("game_logo_") ? "game-logos" : "brand-assets";
+  const extension = file.type === "image/jpeg" ? "jpg" : file.type === "image/png" ? "png" : "webp";
+  const path = `${key.data}/${crypto.randomUUID()}.${extension}`;
+  const { data: previousSetting, error: previousError } = await supabase
+    .from("website_settings")
+    .select("value")
+    .eq("key", key.data)
+    .maybeSingle();
+  if (previousError) return { error: `Could not load the current logo: ${previousError.message}` };
+
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (uploadError) return { error: `Could not upload logo: ${uploadError.message}` };
+
+  const { error: saveError } = await supabase.from("website_settings").upsert({
+    key: key.data,
+    value: path,
+    updated_by: (await getAuthUser(supabase)).user?.id,
+  });
+  if (saveError) {
+    const { error: cleanupError } = await supabase.storage.from(bucket).remove([path]);
+    return {
+      error: cleanupError
+        ? `Could not save logo: ${saveError.message}. Uploaded file cleanup failed: ${cleanupError.message}`
+        : `Could not save logo: ${saveError.message}`,
+    };
+  }
+
+  const oldPath = typeof previousSetting?.value === "string" ? previousSetting.value : null;
+  let cleanupWarning = "";
+  if (oldPath && !/^https?:\/\//i.test(oldPath) && oldPath !== path) {
+    const { error: removeError } = await supabase.storage.from(bucket).remove([oldPath]);
+    if (removeError) cleanupWarning = ` The previous logo could not be removed: ${removeError.message}`;
+  }
+  revalidatePath("/admin/settings");
+  revalidatePath("/login");
+  revalidatePath("/register");
+  revalidatePath("/games");
+  return { success: `Logo saved.${cleanupWarning}` };
+}
+
 export async function savePlan(formData: FormData) {
   const { supabase, error: accessError } = await getAdminClient();
   if (accessError) return { error: accessError };
@@ -400,8 +462,22 @@ export async function saveSchool(formData: FormData) {
   const location = z.string().trim().max(120).safeParse(formData.get("location") ?? "");
   const description = z.string().trim().max(1000).safeParse(formData.get("description") ?? "");
   const isActive = formData.get("is_active") === "true";
+  const candidate = formData.get("logo");
+  const logo = typeof File !== "undefined" && candidate instanceof File && candidate.size > 0
+    ? candidate
+    : null;
   if ((id && !id.success) || !name.success || !location.success || !description.success) {
     return { error: "Check the school fields and try again." };
+  }
+  if (logo && (!["image/jpeg", "image/png", "image/webp"].includes(logo.type) || logo.size > 2 * 1024 * 1024)) {
+    return { error: "Use a JPG, PNG, or WebP school logo no larger than 2 MB." };
+  }
+
+  let previousLogoPath: string | null = null;
+  if (id && logo) {
+    const { data: existing, error } = await supabase.from("schools").select("logo_path").eq("id", id.data).maybeSingle();
+    if (error) return { error: `Could not load current school logo: ${error.message}` };
+    previousLogoPath = existing?.logo_path ?? null;
   }
   const values = {
     name: name.data,
@@ -410,16 +486,42 @@ export async function saveSchool(formData: FormData) {
     is_active: isActive,
   };
   const mutation = id
-    ? await supabase.from("schools").update(values).eq("id", id.data)
-    : await supabase.from("schools").insert(values);
+    ? await supabase.from("schools").update(values).eq("id", id.data).select("id").single()
+    : await supabase.from("schools").insert(values).select("id").single();
   if (mutation.error) {
     if (mutation.error.code === "23505") return { error: "A school with that name already exists." };
     return { error: `Could not save school: ${mutation.error.message}` };
   }
+
+  let success = "School saved.";
+  if (logo) {
+    const extension = logo.type === "image/jpeg" ? "jpg" : logo.type === "image/png" ? "png" : "webp";
+    const logoPath = `${mutation.data.id}/${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("school-logos").upload(logoPath, logo, {
+      contentType: logo.type,
+      upsert: false,
+    });
+    if (uploadError) {
+      return { error: `School details were saved, but the logo upload failed: ${uploadError.message}` };
+    }
+    const { error: logoUpdateError } = await supabase.from("schools").update({ logo_path: logoPath }).eq("id", mutation.data.id);
+    if (logoUpdateError) {
+      const { error: cleanupError } = await supabase.storage.from("school-logos").remove([logoPath]);
+      return {
+        error: cleanupError
+          ? `School details were saved, but the logo could not be linked: ${logoUpdateError.message}. Uploaded file cleanup failed: ${cleanupError.message}`
+          : `School details were saved, but the logo could not be linked: ${logoUpdateError.message}`,
+      };
+    }
+    if (previousLogoPath && !/^https?:\/\//i.test(previousLogoPath)) {
+      const { error: removeError } = await supabase.storage.from("school-logos").remove([previousLogoPath]);
+      if (removeError) success += ` Previous logo cleanup failed: ${removeError.message}`;
+    }
+  }
   revalidatePath("/admin/schools");
   revalidatePath("/schools");
   revalidatePath("/register");
-  return { success: "School saved." };
+  return { success };
 }
 
 export async function saveCategory(formData: FormData) {

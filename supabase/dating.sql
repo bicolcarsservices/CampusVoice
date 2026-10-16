@@ -1,5 +1,6 @@
 -- Run after supabase/schema.sql.
 -- Presence ("Online"), dating profiles, friends, Telegram-style photos, and DMs with unsend.
+-- Run supabase/admin-support.sql after this script to enable the admin support contact list.
 
 create table if not exists public.user_presence (
   user_id uuid primary key references public.profiles(id) on delete cascade,

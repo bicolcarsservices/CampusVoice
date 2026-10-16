@@ -1064,13 +1064,15 @@ grant execute on function
   to authenticated;
 
 -- ---------------------------------------------------------------------
--- 10. STORAGE (avatars, school logos, post images) — skipped with a notice if not permitted
+-- 10. STORAGE (avatars, school logos, brand assets, game logos, post images)
 -- ---------------------------------------------------------------------
 do $$
 begin
   insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values
     ('avatars',      'avatars',      true, 2097152, array['image/jpeg','image/png','image/webp']),
     ('school-logos', 'school-logos', true, 2097152, array['image/jpeg','image/png','image/webp']),
+    ('brand-assets', 'brand-assets', true, 2097152, array['image/jpeg','image/png','image/webp']),
+    ('game-logos',   'game-logos',   true, 2097152, array['image/jpeg','image/png','image/webp']),
     ('post-images',  'post-images',  true, 3145728, array['image/jpeg','image/png','image/webp'])
   on conflict (id) do update set public = excluded.public,
     file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
@@ -1081,9 +1083,11 @@ begin
   drop policy if exists cv_post_image_insert on storage.objects;
   drop policy if exists cv_post_image_delete on storage.objects;
   drop policy if exists cv_school_logo_admin on storage.objects;
+  drop policy if exists cv_brand_game_logo_public_read on storage.objects;
+  drop policy if exists cv_brand_game_logo_admin_write on storage.objects;
 
   create policy cv_public_read on storage.objects for select
-    using (bucket_id in ('avatars','school-logos','post-images'));
+    using (bucket_id in ('avatars','school-logos','brand-assets','game-logos','post-images'));
 
   -- avatar upload requires the 'custom_avatar' feature (Basic/Premium); files live in /<user id>/...
   create policy cv_avatar_insert on storage.objects for insert to authenticated
@@ -1101,6 +1105,12 @@ begin
   create policy cv_school_logo_admin on storage.objects for all to authenticated
     using (bucket_id = 'school-logos' and public.is_admin())
     with check (bucket_id = 'school-logos' and public.is_admin());
+
+  create policy cv_brand_game_logo_public_read on storage.objects for select
+    using (bucket_id in ('brand-assets','game-logos'));
+  create policy cv_brand_game_logo_admin_write on storage.objects for all to authenticated
+    using (bucket_id in ('brand-assets','game-logos') and public.is_admin())
+    with check (bucket_id in ('brand-assets','game-logos') and public.is_admin());
 exception when others then
   raise notice 'Storage setup skipped: %', sqlerrm;
 end $$;

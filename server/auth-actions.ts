@@ -23,6 +23,12 @@ function getSafeNextPath(value?: string) {
   return `${destination.pathname}${destination.search}${destination.hash}`;
 }
 
+function addNoticeToPath(path: string, notice: string) {
+  const destination = new URL(path, "http://campusvoice.local");
+  destination.searchParams.set("notice", notice);
+  return `${destination.pathname}${destination.search}${destination.hash}`;
+}
+
 function getAuthCallbackUrl() {
   const origin = headers().get("origin");
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin || "http://localhost:3000";
@@ -52,7 +58,7 @@ export async function login(_: unknown, fd: FormData) {
   if (adminError) {
     return { error: `You are signed in, but administrator access could not be checked: ${adminError.message}` };
   }
-  redirect(isAdmin ? "/admin" : getSafeNextPath(parsed.data.next) ?? "/wall");
+  redirect(addNoticeToPath(isAdmin ? "/admin" : getSafeNextPath(parsed.data.next) ?? "/wall", "login"));
 }
 
 export async function register(_: unknown, fd: FormData) {
@@ -91,7 +97,7 @@ export async function register(_: unknown, fd: FormData) {
       : "/login?registered=1";
     redirect(destination);
   }
-  redirect(safeNextPath ?? "/wall");
+  redirect(addNoticeToPath(safeNextPath ?? "/wall", "registered"));
 }
 
 export async function resendConfirmation(_: unknown, fd: FormData) {

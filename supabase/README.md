@@ -17,6 +17,15 @@ the profile, and names matching an existing school are also linked to that
 school for feed filters and counts. Review the SQL output for errors before
 using updated features.
 
+## School, login, and game logos
+
+The schema creates the public school-logo, brand-assets, and game-logos
+storage buckets. For an existing project, run `supabase/branding-game-assets.sql`
+after `supabase/schema.sql` in the SQL Editor. An administrator can then upload
+school logos under **Admin → Schools**, and the login/registration header,
+login/registration form, and each built-in game logo under **Admin → Settings**.
+Uploads accept JPG, PNG, or WebP files up to 2 MB.
+
 ## Dating, messages, and online presence
 
 After `supabase/schema.sql`, run `supabase/dating.sql` in the Supabase SQL

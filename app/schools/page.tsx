@@ -1,29 +1,79 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { publicStorageUrl } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
 
 export default async function SchoolsPage() {
-  const { data: schools, error } = await createClient().from("school_stats")
+  const supabase = createClient();
+  const { data: schools, error } = await supabase.from("school_stats")
     .select("id,name,location,description,logo_path,user_count,post_count").order("name");
   if (error) throw new Error(`Could not load schools: ${error.message}`);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header className="max-w-2xl"><p className="eyebrow">Across campuses</p><h1 className="text-4xl font-extrabold">Schools in the community</h1><p className="mt-3 text-slate-600 dark:text-slate-300">Explore posts and conversations from participating schools.</p></header>
-      {!schools?.length && <p className="card text-slate-500">No active schools are listed yet.</p>}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {(schools ?? []).map((school) => (
-          <article className="card" key={school.id}>
-            {school.logo_path ? <img src={school.logo_path} alt="" className="mb-4 h-14 w-14 rounded-xl object-cover" /> : <div className="avatar-fallback mb-4">CV</div>}
-            <h2 className="text-xl font-bold">{school.name}</h2>
-            {school.location && <p className="mt-1 text-sm text-slate-500">{school.location}</p>}
-            {school.description && <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">{school.description}</p>}
-            <p className="mt-4 text-xs text-slate-500">{school.user_count} members · {school.post_count} posts</p>
-            <Link href={`/wall?school=${school.id}`} className="mt-4 inline-flex font-semibold text-brand">Explore school posts →</Link>
-          </article>
-        ))}
-      </div>
+    <div className="school-directory">
+      <header className="school-directory-hero">
+        <div className="school-hero-orbit school-hero-orbit-one" aria-hidden="true" />
+        <div className="school-hero-orbit school-hero-orbit-two" aria-hidden="true" />
+        <div className="relative z-10 max-w-2xl">
+          <p className="school-directory-kicker">A community for every campus</p>
+          <h1>Find your school.<br /><span>Find your people.</span></h1>
+          <p>Explore the campuses sharing stories, ideas, and everyday student life on CampusVoice.</p>
+          <div className="school-directory-count">
+            <span className="school-count-icon" aria-hidden="true">⌂</span>
+            <strong>{schools?.length ?? 0}</strong>
+            <span>campuses in our community</span>
+          </div>
+        </div>
+        <div className="school-hero-emblem" aria-hidden="true">
+          <span>CV</span><i /><b /><em />
+        </div>
+      </header>
+
+      <section className="school-directory-section" aria-labelledby="school-list-title">
+        <div className="school-directory-section-heading">
+          <div>
+            <p className="school-directory-kicker">Explore campuses</p>
+            <h2 id="school-list-title">Schools in the community</h2>
+          </div>
+          <span className="school-section-caption">Discover what's happening on campus</span>
+        </div>
+
+        {!schools?.length && (
+          <p className="school-directory-empty">No active schools are listed yet. Please check back soon.</p>
+        )}
+        <div className="school-directory-grid">
+          {(schools ?? []).map((school, index) => {
+            const logoUrl = publicStorageUrl(supabase, "school-logos", school.logo_path);
+            return (
+              <article className="school-directory-card" key={school.id}>
+                <div className={`school-card-cover school-card-cover-${index % 4}`}>
+                  <div className="school-card-cover-pattern" aria-hidden="true" />
+                  <span className="school-card-number">{String(index + 1).padStart(2, "0")}</span>
+                  <div className="school-card-logo">
+                    {logoUrl
+                      ? <img src={logoUrl} alt={`${school.name} logo`} />
+                      : <span aria-hidden="true">{school.name.slice(0, 2).toUpperCase()}</span>}
+                  </div>
+                  <span className="school-card-status"><i /> Active campus</span>
+                </div>
+                <div className="school-card-content">
+                  <h3>{school.name}</h3>
+                  {school.location && <p className="school-card-location"><span aria-hidden="true">⌖</span>{school.location}</p>}
+                  {school.description && <p className="school-card-description">{school.description}</p>}
+                  <div className="school-card-stats">
+                    <span><strong>{school.user_count}</strong> members</span>
+                    <span><strong>{school.post_count}</strong> posts</span>
+                  </div>
+                  <Link href={`/wall?school=${school.id}`} className="school-card-link">
+                    Explore campus <span aria-hidden="true">↗</span>
+                  </Link>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
