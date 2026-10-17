@@ -1,10 +1,10 @@
 import FloatingModal from "@/components/FloatingModal";
-import SubscriptionPage from "@/app/subscription/page";
+import SubscriptionPlans from "@/components/SubscriptionPlans";
 
 export default function SubscriptionModalPage({
   searchParams,
 }: {
   searchParams?: { intent_id?: string | string[] };
 }) {
-  return <FloatingModal><SubscriptionPage searchParams={searchParams} compact /></FloatingModal>;
+  return <FloatingModal><SubscriptionPlans searchParams={searchParams} compact /></FloatingModal>;
 }

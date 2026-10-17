@@ -17,6 +17,7 @@ const adminLinks = [
   ["Plans", "/admin/plans"],
   ["Settings", "/admin/settings"],
   ["Announcements", "/admin/announcements"],
+  ["Pop-up Texts", "/admin/pop-up-texts"],
   ["Schools", "/admin/schools"],
   ["Categories", "/admin/categories"],
 ] as const;

@@ -1,6 +1,8 @@
 import { createClient, getAuthUser, hasSupabaseConfig } from "@/lib/supabase/server";
 import Link from "next/link";
 import PostCard from "@/components/community/PostCard";
+import WallFilters from "@/components/community/WallFilters";
+import WallPopupTicker from "@/components/community/WallPopupTicker";
 import { getOnlineNowCount } from "@/lib/presence";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +27,8 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
 
   const supabase = createClient();
   const q = (searchParams?.q ?? "").trim().slice(0, 80);
-  const sort = ["popular", "discussed"].includes(searchParams?.sort ?? "") ? searchParams?.sort : "latest";
+  const requestedSort = searchParams?.sort;
+  const sort = requestedSort === "popular" || requestedSort === "discussed" ? requestedSort : "latest";
   const schoolId = searchParams?.school;
   const categoryId = searchParams?.category;
   const parsedPage = Number(searchParams?.page ?? 1);
@@ -43,16 +46,23 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
   if (categoryId) postsQuery = postsQuery.eq("category_id", categoryId);
 
   const [{ data: posts, error: postsError }, { data: schools, error: schoolsError },
-    { data: categories, error: categoriesError }, { user }, onlineCount] = await Promise.all([
+    { data: categories, error: categoriesError }, { data: popupSetting, error: popupSettingError },
+    { user }, onlineCount] = await Promise.all([
     postsQuery,
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
     supabase.from("categories").select("id,name").eq("is_active", true).order("sort_order"),
+    supabase.from("website_settings").select("value").eq("key", "wall_popup_texts").maybeSingle(),
     getAuthUser(supabase),
     getOnlineNowCount(supabase),
   ]);
   if (postsError) throw new Error(`Could not load Freedom Wall posts: ${postsError.message}`);
   if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);
   if (categoriesError) throw new Error(`Could not load categories: ${categoriesError.message}`);
+  if (popupSettingError) throw new Error(`Could not load Freedom Wall pop-up texts: ${popupSettingError.message}`);
+  const popupTexts = popupSetting?.value;
+  if (popupTexts !== undefined && (!Array.isArray(popupTexts) || !popupTexts.every((text) => typeof text === "string"))) {
+    throw new Error("The saved Freedom Wall pop-up text setting has an invalid format.");
+  }
 
   const postRows = posts ?? [];
   const postIds = postRows.map((post) => post.id);
@@ -96,6 +106,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
+      <WallPopupTicker texts={popupTexts ?? []} />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="eyebrow">Your community feed</p>
@@ -107,35 +118,14 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
         </div>
         {canInteract && <Link href="/wall/new" className="btn-primary">Create post</Link>}
       </header>
-      <form className="card grid gap-3 sm:grid-cols-2" action="/wall">
-        <label className="text-sm sm:col-span-2">
-          Search posts
-          <input name="q" defaultValue={q} maxLength={80} className="input mt-1" placeholder="Search the wall..." />
-        </label>
-        <label className="text-sm">
-          Sort by
-          <select name="sort" defaultValue={sort} className="input mt-1">
-            <option value="latest">Latest</option>
-            <option value="popular">Popular</option>
-            <option value="discussed">Most discussed</option>
-          </select>
-        </label>
-        <label className="text-sm">
-          School
-          <select name="school" defaultValue={schoolId ?? ""} className="input mt-1">
-            <option value="">All schools</option>
-            {(schools ?? []).map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}
-          </select>
-        </label>
-        <label className="text-sm">
-          Category
-          <select name="category" defaultValue={categoryId ?? ""} className="input mt-1">
-            <option value="">All categories</option>
-            {(categories ?? []).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-          </select>
-        </label>
-        <button className="btn-ghost self-end" type="submit">Apply filters</button>
-      </form>
+      <WallFilters
+        query={q}
+        sort={sort}
+        schoolId={schoolId}
+        categoryId={categoryId}
+        schools={schools ?? []}
+        categories={categories ?? []}
+      />
 
       {postRows.length === 0 && (
         <section className="card text-center">

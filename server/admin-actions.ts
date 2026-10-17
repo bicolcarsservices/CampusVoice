@@ -298,7 +298,6 @@ export async function saveBrandLogo(formData: FormData) {
   if (accessError) return { error: accessError };
   const key = z.enum([
     "auth_hero_logo",
-    "auth_form_logo",
     "game_logo_campus_doodle",
     "game_logo_campus_coin_rush",
     "game_logo_galactic_striker",
@@ -438,6 +437,7 @@ export async function saveAnnouncement(formData: FormData) {
   if (mutation.error) return { error: `Could not save announcement: ${mutation.error.message}` };
   revalidatePath("/admin/announcements");
   revalidatePath("/");
+  revalidatePath("/wall");
   return { success: "Announcement saved." };
 }
 
@@ -450,7 +450,33 @@ export async function deleteAnnouncement(formData: FormData) {
   if (error) return { error: `Could not delete announcement: ${error.message}` };
   revalidatePath("/admin/announcements");
   revalidatePath("/");
+  revalidatePath("/wall");
   return { success: "Announcement deleted." };
+}
+
+export async function saveWallPopupTexts(formData: FormData) {
+  const { supabase, error: accessError } = await getAdminClient();
+  if (accessError) return { error: accessError };
+
+  const submittedTexts = formData.getAll("texts");
+  if (submittedTexts.some((text) => typeof text !== "string")) {
+    return { error: "Each pop-up text must be plain text." };
+  }
+  const texts = z.array(z.string().trim().max(180)).max(30)
+    .safeParse(submittedTexts.filter((text): text is string => typeof text === "string")
+      .map((text) => text.trim()).filter(Boolean));
+  if (!texts.success) return { error: "Use up to 30 non-empty messages, with no more than 180 characters per message." };
+
+  const { error } = await supabase.from("website_settings").upsert({
+    key: "wall_popup_texts",
+    value: texts.data,
+    updated_by: (await getAuthUser(supabase)).user?.id,
+  });
+  if (error) return { error: `Could not save Freedom Wall pop-up texts: ${error.message}` };
+
+  revalidatePath("/admin/pop-up-texts");
+  revalidatePath("/wall");
+  return { success: "Freedom Wall pop-up texts saved." };
 }
 
 export async function saveSchool(formData: FormData) {

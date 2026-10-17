@@ -9,7 +9,7 @@ export default async function AdminAnnouncementsPage() {
 
   return (
     <section className="space-y-5">
-      <div><h2 className="text-2xl font-bold">Announcements</h2><p className="text-sm text-slate-500">Published notices can be displayed on the public homepage.</p></div>
+      <div><h2 className="text-2xl font-bold">Announcements</h2><p className="text-sm text-slate-500">Published announcements appear in the announcement panel beside CampusVoice Support. Pop-up texts for the Freedom Wall are managed separately under Pop-up Texts.</p></div>
       <article className="card">
         <h3 className="mb-3 text-lg font-bold">Create announcement</h3>
         <AdminActionForm action={saveAnnouncement} submitLabel="Create announcement">

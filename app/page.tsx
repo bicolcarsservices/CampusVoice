@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
+import ShareQrCode from "@/components/ShareQrCode";
+import { campusVoicePublicUrl } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
 
@@ -13,39 +15,22 @@ export default async function Home() {
     created_at: string;
   }> = [];
   let schools: Array<{ id: string; name: string }> = [];
-  let announcements: Array<{ id: string; title: string; body: string }> = [];
-
   if (hasSupabaseConfig()) {
     const supabase = createClient();
-    const [{ data: preview, error: postsError }, { data: activeSchools, error: schoolsError },
-      { data: activeAnnouncements, error: announcementsError }] = await Promise.all([
+    const [{ data: preview, error: postsError }, { data: activeSchools, error: schoolsError }] = await Promise.all([
       supabase.from("public_posts")
         .select("id,content,is_anonymous,username,display_name,created_at")
         .order("created_at", { ascending: false }).limit(3),
       supabase.from("schools").select("id,name").eq("is_active", true).order("name").limit(6),
-      supabase.from("announcements").select("id,title,body").eq("is_published", true).order("created_at", { ascending: false }).limit(3),
     ]);
     if (postsError) throw new Error(`Could not load the homepage feed: ${postsError.message}`);
     if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);
-    if (announcementsError) throw new Error(`Could not load announcements: ${announcementsError.message}`);
     posts = preview ?? [];
     schools = activeSchools ?? [];
-    announcements = activeAnnouncements ?? [];
   }
 
   return (
     <div className="space-y-20 pb-12">
-      {!!announcements.length && (
-        <section aria-label="CampusVoice announcements" className="space-y-3">
-          {announcements.map((announcement) => (
-            <article key={announcement.id} className="card border-sky-200 bg-[#E0F2FE] dark:border-slate-700 dark:bg-slate-900">
-              <p className="eyebrow">Announcement</p>
-              <h2 className="font-bold">{announcement.title}</h2>
-              <p className="mt-1 text-sm">{announcement.body}</p>
-            </article>
-          ))}
-        </section>
-      )}
       <section className="grid items-center gap-10 py-10 sm:py-16 md:grid-cols-[1.1fr_.9fr]">
         <div>
           <p className="eyebrow">Your Voice. Your Space. Your Story.</p>
@@ -76,6 +61,26 @@ export default async function Home() {
               <span className="tag">{label}</span><p className="mt-2 font-medium">{text}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="share-campusvoice-card">
+        <ShareQrCode />
+        <div>
+          <p className="eyebrow">Share CampusVoice</p>
+          <h2 className="text-2xl font-bold">Open CampusVoice on your phone.</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            Scan this QR code with your phone camera to visit the deployed CampusVoice app.
+          </p>
+          <a
+            href={campusVoicePublicUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-block break-all text-sm font-semibold text-brand"
+          >
+            {campusVoicePublicUrl}
+          </a>
+          <p className="mt-3 text-xs text-slate-500">Download or scan the QR code to share CampusVoice.</p>
         </div>
       </section>
 

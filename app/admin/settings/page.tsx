@@ -1,7 +1,7 @@
 import AdminActionForm from "@/components/admin/AdminActionForm";
 import { createClient } from "@/lib/supabase/server";
 import { saveBrandLogo, saveWebsiteSetting } from "@/server/admin-actions";
-import { authLogoSettings, gameLogoSettings, publicStorageUrl } from "@/lib/branding";
+import { authLogoSettingKeys, authLogoSettings, gameLogoSettings, publicStorageUrl } from "@/lib/branding";
 
 const settingInfo = [
   { key: "site_name", label: "Website name", fallback: "CampusVoice", type: "text" },
@@ -13,7 +13,19 @@ const settingInfo = [
 
 export default async function AdminSettingsPage() {
   const supabase = createClient();
-  const { data, error } = await supabase.from("website_settings").select("key,value");
+  const settingKeys = [
+    "site_name",
+    "tagline",
+    "free_daily_post_limit",
+    "require_post_approval",
+    "maintenance_mode",
+    ...authLogoSettingKeys,
+    ...gameLogoSettings.map((setting) => setting.key),
+  ];
+  const { data, error } = await supabase
+    .from("website_settings")
+    .select("key,value")
+    .in("key", settingKeys);
   if (error) throw new Error(`Could not load website settings: ${error.message}`);
   const values = new Map((data ?? []).map((row) => [row.key, row.value]));
   const logoSettings = [

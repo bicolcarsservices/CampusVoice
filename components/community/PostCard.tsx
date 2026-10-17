@@ -38,6 +38,29 @@ const postReactions = [
   { kind: "angry", label: "Angry", emoji: "😡" },
 ] as const;
 
+const categoryToneByName: Record<string, number> = {
+  rant: 0,
+  shoutout: 1,
+  confession: 2,
+  question: 3,
+  advice: 4,
+  experience: 5,
+  appreciation: 6,
+  achievement: 7,
+};
+
+function getCategoryTone(name: string) {
+  const normalizedName = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const assignedTone = categoryToneByName[normalizedName];
+  if (assignedTone !== undefined) return assignedTone;
+
+  let hash = 0;
+  for (const character of normalizedName) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  return hash % 8;
+}
+
 function PendingButton({ children, className }: { children: React.ReactNode; className?: string }) {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={pending} className={className}>{pending ? "Sending..." : children}</button>;
@@ -84,7 +107,9 @@ export default function PostCard({
             </p>
           </div>
         </div>
-        <span className="tag">{categoryName}</span>
+        <span className={`tag post-category-badge post-category-badge--${getCategoryTone(categoryName)}`}>
+          {categoryName}
+        </span>
       </header>
 
       <p className="whitespace-pre-wrap break-words">{post.content}</p>

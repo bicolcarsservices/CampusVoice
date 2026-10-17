@@ -136,16 +136,6 @@ export default function PublicNavbar({
           </div>
         </nav>
       )}
-      {signedIn && (
-        <Link
-          href="/support"
-          className={`support-launcher${isActivePath(pathname, "/support") ? " support-launcher-active" : ""}`}
-          aria-label="CampusVoice Support chat"
-          title="CampusVoice Support"
-        >
-          <NavigationIcon name="support" />
-        </Link>
-      )}
     </>
   );
 }

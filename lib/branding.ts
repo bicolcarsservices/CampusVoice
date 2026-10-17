@@ -1,9 +1,12 @@
 import type { createClient } from "@/lib/supabase/server";
 
+export const campusVoicePublicUrl = "https://campus-voice-pi.vercel.app/";
+
 export const authLogoSettings = [
-  { key: "auth_hero_logo", label: "Login and registration header logo" },
-  { key: "auth_form_logo", label: "Login and registration form logo" },
+  { key: "auth_hero_logo", label: "Login and registration logo" },
 ] as const;
+
+export const authLogoSettingKeys = ["auth_hero_logo", "auth_form_logo"] as const;
 
 export const gameLogoSettings = [
   { key: "game_logo_campus_doodle", label: "Campus Doodle logo" },
