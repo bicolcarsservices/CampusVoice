@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { resolveSchoolName } from "@/lib/schools";
@@ -93,7 +94,7 @@ export async function createPost(_: ActionState, formData: FormData): Promise<Ac
 
   revalidatePath("/wall");
   revalidatePath("/profile");
-  return { success: "Your post has been published." };
+  redirect("/wall?posted=1");
 }
 
 export async function addComment(_: ActionState, formData: FormData): Promise<ActionState> {
@@ -158,9 +159,11 @@ export async function toggleReaction(_: ActionState, formData: FormData): Promis
 
   const postValue = formData.get("post_id");
   const commentValue = formData.get("comment_id");
+  const reactionKind = z.enum(["like", "love", "haha", "sad", "angry"])
+    .safeParse(formData.get("kind") ?? "like");
   const postId = postValue ? uuidSchema.safeParse(postValue) : null;
   const commentId = commentValue ? uuidSchema.safeParse(commentValue) : null;
-  if (!!postValue === !!commentValue || (postId && !postId.success) || (commentId && !commentId.success)) {
+  if (!reactionKind.success || !!postValue === !!commentValue || (postId && !postId.success) || (commentId && !commentId.success)) {
     return { error: "That post or comment could not be found." };
   }
   const target = postId?.success
@@ -174,17 +177,23 @@ export async function toggleReaction(_: ActionState, formData: FormData): Promis
   if (readError) return { error: `Could not update reaction: ${readError.message}` };
 
   const mutation = existing
-    ? await result.supabase.from("reactions").delete().eq("id", existing.id)
+    ? target.column === "comment_id" || existing.kind === reactionKind.data
+      ? await result.supabase.from("reactions").delete().eq("id", existing.id)
+      : await result.supabase.from("reactions").update({ kind: reactionKind.data }).eq("id", existing.id)
     : await result.supabase.from("reactions").insert({
         user_id: result.user.id,
         post_id: target.column === "post_id" ? target.id : null,
         comment_id: target.column === "comment_id" ? target.id : null,
-        kind: "like",
+        kind: reactionKind.data,
       });
   if (mutation.error) return { error: `Could not update reaction: ${mutation.error.message}` };
 
   revalidatePath("/wall");
-  return { success: existing ? "Reaction removed." : "Post liked." };
+  return {
+    success: existing
+      ? target.column === "comment_id" || existing.kind === reactionKind.data ? "Reaction removed." : "Reaction updated."
+      : "Reaction added.",
+  };
 }
 
 export async function createSubscriptionRequest(_: ActionState, formData: FormData): Promise<ActionState> {

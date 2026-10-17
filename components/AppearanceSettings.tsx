@@ -15,13 +15,28 @@ export default function AppearanceSettings() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(preferenceKey);
-      if (saved === "light" || saved === "dark") setAppearance(saved);
-    } catch (storageError) {
-      console.error("Could not read the saved appearance preference.", storageError);
-      setError("Your browser could not load the saved appearance setting.");
-    }
+    const syncAppearance = () => {
+      try {
+        const saved = localStorage.getItem(preferenceKey);
+        setAppearance(saved === "light" || saved === "dark" ? saved : "system");
+        setError(null);
+      } catch (storageError) {
+        console.error("Could not read the saved appearance preference.", storageError);
+        setError("Your browser could not load the saved appearance setting.");
+      }
+    };
+    const onPreferenceChange = (event: Event) => {
+      const preference = (event as CustomEvent<Appearance>).detail;
+      if (preference === "system" || preference === "light" || preference === "dark") setAppearance(preference);
+    };
+
+    syncAppearance();
+    window.addEventListener("storage", syncAppearance);
+    window.addEventListener("campusvoice-appearance-change", onPreferenceChange);
+    return () => {
+      window.removeEventListener("storage", syncAppearance);
+      window.removeEventListener("campusvoice-appearance-change", onPreferenceChange);
+    };
   }, []);
 
   function chooseAppearance(value: Appearance) {

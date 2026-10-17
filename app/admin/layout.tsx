@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import AdminNavigation from "@/components/admin/AdminNavigation";
+import AppearanceToggle from "@/components/AppearanceToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="eyebrow">Private workspace</p><h1 className="text-3xl font-extrabold">Admin dashboard</h1></div>
           <div className="flex flex-wrap gap-2">
+            <AppearanceToggle compact />
             <Link href="/admin/support" className="btn-ghost">Support inbox</Link>
             <Link href="/" className="btn-ghost">View public site</Link>
           </div>

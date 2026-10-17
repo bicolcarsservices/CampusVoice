@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/auth-actions";
+import AppearanceToggle from "@/components/AppearanceToggle";
 
 type NavigationIconName = "bell" | "user" | "messages" | "post" | "plus" | "games" | "wallet" | "support";
 
@@ -83,6 +84,7 @@ export default function PublicNavbar({
             <Link href="/guidelines" aria-current={isActivePath(pathname, "/guidelines") ? "page" : undefined} className={`public-nav-button${isActivePath(pathname, "/guidelines") ? " public-nav-active" : ""}`}>Guidelines</Link>
           </div>
           <div className="public-nav-account">
+            <AppearanceToggle compact />
             {signedIn && (
               <>
                 <Link

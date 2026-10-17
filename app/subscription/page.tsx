@@ -77,7 +77,7 @@ export default async function SubscriptionPage({
           const planFeatures = (features ?? []).filter((feature) => feature.plan_id === plan.id);
           const featured = plan.code === "premium";
           return (
-            <article key={plan.id} className={`card flex flex-col ${compact ? "plan-picker-card" : "mobile-plan-picker-card"} ${featured ? "border-violet-400 ring-2 ring-violet-100 dark:ring-violet-900" : ""}`}>
+            <article key={plan.id} className={`card flex flex-col ${compact ? "plan-picker-card" : "mobile-plan-picker-card"} ${featured ? "border-sky-400 ring-2 ring-sky-100 dark:border-sky-500 dark:ring-sky-900" : ""}`}>
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-2xl font-bold">{plan.name}</h2>
                 {plan.badge_label && <span className="tag">{plan.badge_label}</span>}

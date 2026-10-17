@@ -17,7 +17,7 @@ export default async function NotificationsPage() {
       <header><p className="eyebrow">Your updates</p><h1 className="text-3xl font-bold">Notifications</h1></header>
       {!notifications?.length && <p className="card text-slate-500">You have no notifications yet.</p>}
       {(notifications ?? []).map((notification) => (
-        <article className={`card flex flex-wrap items-start justify-between gap-3 ${notification.is_read ? "opacity-75" : "border-violet-300"}`} key={notification.id}>
+        <article className={`card flex flex-wrap items-start justify-between gap-3 ${notification.is_read ? "opacity-75" : "border-sky-300"}`} key={notification.id}>
           <div><p className="font-semibold">{notification.message}</p><p className="mt-1 text-xs capitalize text-slate-500">{notification.type.replaceAll("_", " ")} · {new Date(notification.created_at).toLocaleString()}</p></div>
           <div className="flex gap-2">
             {notification.link && <a className="btn-ghost" href={notification.link}>Open</a>}

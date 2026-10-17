@@ -62,7 +62,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
       supabase.from("comments").select("id,post_id,parent_id,content,reaction_count,created_at").in("post_id", postIds)
         .eq("status", "approved").order("created_at", { ascending: true }),
       user
-        ? supabase.from("reactions").select("post_id").eq("user_id", user.id).in("post_id", postIds)
+        ? supabase.from("reactions").select("post_id,kind").eq("user_id", user.id).in("post_id", postIds)
         : Promise.resolve({ data: [], error: null }),
       user
         ? supabase.from("my_comment_ids").select("id").in("post_id", postIds)
@@ -80,7 +80,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
   }
   const schoolNames = new Map((schools ?? []).map((school) => [school.id, school.name]));
   const categoryNames = new Map((categories ?? []).map((category) => [category.id, category.name]));
-  const likedIds = new Set((likedRows ?? []).map((row) => row.post_id));
+  const reactionKinds = new Map((likedRows ?? []).map((row) => [row.post_id, row.kind]));
   const myCommentIds = new Set((myComments ?? []).map((row) => row.id));
   const commentIds = (comments ?? []).map((comment) => comment.id);
   const { data: likedComments, error: likedCommentsError } = user && commentIds.length
@@ -165,7 +165,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
               liked: likedCommentIds.has(comment.id),
             }))}
             canInteract={canInteract}
-            liked={likedIds.has(post.id)}
+            reactionKind={reactionKinds.get(post.id) ?? null}
           />
         );
       })}

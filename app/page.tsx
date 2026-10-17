@@ -38,7 +38,7 @@ export default async function Home() {
       {!!announcements.length && (
         <section aria-label="CampusVoice announcements" className="space-y-3">
           {announcements.map((announcement) => (
-            <article key={announcement.id} className="card border-violet-200 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/40">
+            <article key={announcement.id} className="card border-sky-200 bg-[#E0F2FE] dark:border-slate-700 dark:bg-slate-900">
               <p className="eyebrow">Announcement</p>
               <h2 className="font-bold">{announcement.title}</h2>
               <p className="mt-1 text-sm">{announcement.body}</p>
@@ -62,7 +62,7 @@ export default async function Home() {
           </div>
           <p className="mt-4 text-sm text-slate-500">A community for every campus. Built around expression, privacy, and respect.</p>
         </div>
-        <div className="card space-y-3 bg-gradient-to-br from-violet-50 to-white dark:from-violet-950 dark:to-slate-900">
+        <div className="card space-y-3 bg-gradient-to-br from-[#E0F2FE] to-white dark:from-slate-900 dark:to-slate-900">
           <div className="flex items-center justify-between">
             <div><p className="eyebrow">A little space to speak up</p><h2 className="text-xl font-bold">Campus conversations</h2></div>
             <span aria-hidden="true" className="text-3xl">✦</span>
@@ -72,7 +72,7 @@ export default async function Home() {
             ["A reminder", "You don’t have to have everything figured out today."],
             ["A community", "Listen with care. Share with respect."],
           ].map(([label, text]) => (
-            <div key={label} className="rounded-xl border border-violet-100 bg-white/80 p-4 dark:border-violet-900 dark:bg-slate-900/70">
+            <div key={label} className="rounded-xl border border-sky-100 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/70">
               <span className="tag">{label}</span><p className="mt-2 font-medium">{text}</p>
             </div>
           ))}
@@ -121,7 +121,7 @@ export default async function Home() {
           <p className="text-slate-600 dark:text-slate-300">Share experiences, get perspective, celebrate small wins, and connect across schools.</p>
           <Link href="/about" className="font-semibold text-brand">Learn about CampusVoice →</Link>
         </div>
-        <div className="card border-violet-200 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/40">
+        <div className="card border-sky-200 bg-[#E0F2FE] dark:border-slate-700 dark:bg-slate-900">
           <p className="eyebrow">Community safety</p>
           <h3 className="text-xl font-bold">Freedom of expression does not mean freedom to harm others.</h3>
           <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">Report threats, harassment, bullying, or private information. Anonymous posting hides your public identity, but serious safety issues may be investigated by authorized administrators.</p>
@@ -152,10 +152,10 @@ export default async function Home() {
         </details>
       </section>
 
-      <section className="rounded-3xl bg-violet-700 px-6 py-10 text-center text-white sm:px-10">
+      <section className="rounded-3xl bg-brand px-6 py-10 text-center text-white dark:text-[#0B1220] sm:px-10">
         <h2 className="text-3xl font-bold">Your story belongs here.</h2>
-        <p className="mx-auto mt-2 max-w-xl text-violet-100">Join the conversation, share something meaningful, and help build a better campus community.</p>
-        <Link href="/register" className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-bold text-violet-800">Get started</Link>
+        <p className="mx-auto mt-2 max-w-xl text-white/90 dark:text-[#0B1220]">Join the conversation, share something meaningful, and help build a better campus community.</p>
+        <Link href="/register" className="mt-5 inline-flex rounded-xl bg-white px-5 py-3 font-bold text-[#102A43] dark:bg-[#0B1220] dark:text-[#38BDF8]">Get started</Link>
       </section>
 
       <footer className="flex flex-wrap justify-between gap-3 border-t border-slate-200 pt-6 text-sm text-slate-500 dark:border-slate-800">

@@ -123,8 +123,8 @@ export default async function GamesPage() {
                   <div className="doodle-art" aria-hidden="true">
                     <svg viewBox="0 0 180 120">
                       <path d="M24 78c18-5 21-35 38-30 11 3-8 38 3 40 10 2 18-35 30-32 12 3-4 26 7 28 9 2 19-20 31-18" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="6" />
-                      <path d="m119 22 25 25m-31-18 25 25-38 38-24 6 6-24z" fill="none" stroke="#ffe36e" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
-                      <circle cx="38" cy="34" r="5" fill="#fd77d0" /><circle cx="155" cy="75" r="4" fill="#75f3e0" />
+                      <path d="m119 22 25 25m-31-18 25 25-38 38-24 6 6-24z" fill="none" stroke="#38BDF8" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+                      <circle cx="38" cy="34" r="5" fill="#7DD3FC" /><circle cx="155" cy="75" r="4" fill="#38BDF8" />
                     </svg>
                   </div>
                 )}

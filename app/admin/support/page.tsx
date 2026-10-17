@@ -49,7 +49,7 @@ export default async function AdminSupportPage() {
               </span>
               <span className="block truncate text-sm text-slate-500">{conversation.last_message || "No messages yet"}</span>
             </span>
-            <span className="rounded-full bg-violet-100 px-2 py-1 text-xs font-bold text-violet-800">{conversation.message_count}</span>
+            <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-bold text-sky-800 dark:bg-sky-950/50 dark:text-sky-200">{conversation.message_count}</span>
           </Link>
         ))}
       </div>

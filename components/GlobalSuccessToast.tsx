@@ -3,34 +3,40 @@
 import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-type SuccessNotice = { message: string };
+type SuccessNotice = { message: string; duration: number };
 
 export default function GlobalSuccessToast() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const notice = searchParams.get("notice");
   const registered = searchParams.get("registered") === "1";
+  const postPublished = pathname === "/wall" && searchParams.get("posted") === "1";
   const [toast, setToast] = useState<SuccessNotice | null>(null);
 
   useEffect(() => {
-    const id = notice === "login" ? `${pathname}:login` :
+    const id = postPublished ? `${pathname}:post` :
+      notice === "login" ? `${pathname}:login` :
       notice === "registered" || registered ? `${pathname}:registered` : null;
     if (!id) return;
 
     setToast({
-      message: id.endsWith(":login")
-        ? "You’re logged in successfully."
-        : "Your account was created successfully. Check your email if confirmation is required.",
+      message: id.endsWith(":post")
+        ? "Posted! Your post is now on the Freedom Wall."
+        : id.endsWith(":login")
+          ? "You’re logged in successfully."
+          : "Your account was created successfully. Check your email if confirmation is required.",
+      duration: id.endsWith(":post") ? 3000 : 6500,
     });
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete("notice");
     cleanUrl.searchParams.delete("registered");
+    cleanUrl.searchParams.delete("posted");
     window.history.replaceState(window.history.state, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
-  }, [notice, pathname, registered]);
+  }, [notice, pathname, postPublished, registered]);
 
   useEffect(() => {
     if (!toast) return;
-    const timeout = window.setTimeout(() => setToast(null), 6500);
+    const timeout = window.setTimeout(() => setToast(null), toast.duration);
     return () => window.clearTimeout(timeout);
   }, [toast]);
 

@@ -30,6 +30,14 @@ type Post = {
   avatar_path: string | null;
 };
 
+const postReactions = [
+  { kind: "like", label: "Like", emoji: "👍" },
+  { kind: "love", label: "Love", emoji: "❤️" },
+  { kind: "haha", label: "Haha", emoji: "😂" },
+  { kind: "sad", label: "Cry", emoji: "😢" },
+  { kind: "angry", label: "Angry", emoji: "😡" },
+] as const;
+
 function PendingButton({ children, className }: { children: React.ReactNode; className?: string }) {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={pending} className={className}>{pending ? "Sending..." : children}</button>;
@@ -42,7 +50,7 @@ export default function PostCard({
   imageUrl,
   comments,
   canInteract,
-  liked,
+  reactionKind,
 }: {
   post: Post;
   schoolName: string;
@@ -50,11 +58,12 @@ export default function PostCard({
   imageUrl: string | null;
   comments: CommentItem[];
   canInteract: boolean;
-  liked: boolean;
+  reactionKind: string | null;
 }) {
   const [commentState, commentAction] = useFormState(addComment, null);
   const [reportState, reportAction] = useFormState(reportContent, null);
   const [reactionState, reactionAction] = useFormState(toggleReaction, null);
+  const selectedReaction = postReactions.find((reaction) => reaction.kind === reactionKind);
   const name = post.is_anonymous ? "Anonymous" : post.display_name || post.username || "Community member";
 
   return (
@@ -83,12 +92,25 @@ export default function PostCard({
 
       <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 text-sm text-slate-600">
         {canInteract ? (
-          <form action={reactionAction}>
-            <input type="hidden" name="post_id" value={post.id} />
-            <PendingButton className={`text-action ${liked ? "text-brand" : ""}`}>
-              {liked ? "♥ Liked" : "♡ Like"} · {post.reaction_count}
-            </PendingButton>
-          </form>
+          <details className="post-reaction-picker">
+            <summary className={`text-action${selectedReaction ? " post-reaction-selected" : ""}`}>
+              {selectedReaction ? `${selectedReaction.emoji} ${selectedReaction.label}` : "♡ Like"} · {post.reaction_count}
+            </summary>
+            <div className="post-reaction-options" aria-label="Choose a reaction">
+              {postReactions.map((reaction) => (
+                <form action={reactionAction} key={reaction.kind}>
+                  <input type="hidden" name="post_id" value={post.id} />
+                  <input type="hidden" name="kind" value={reaction.kind} />
+                  <PendingButton
+                    className={`post-reaction-option${reactionKind === reaction.kind ? " post-reaction-option-selected" : ""}`}
+                  >
+                    <span aria-hidden="true">{reaction.emoji}</span>
+                    <span>{reaction.label}</span>
+                  </PendingButton>
+                </form>
+              ))}
+            </div>
+          </details>
         ) : <span>♥ {post.reaction_count} reactions</span>}
         <span>{post.comment_count} comments</span>
         {reactionState?.error && <span role="alert" className="text-red-700">{reactionState.error}</span>}
@@ -103,6 +125,7 @@ export default function PostCard({
               <p className="whitespace-pre-wrap break-words">{comment.content}</p>
               <form action={reactionAction} className="mt-1">
                 <input type="hidden" name="comment_id" value={comment.id} />
+                <input type="hidden" name="kind" value="like" />
                 <PendingButton className={`text-xs font-semibold ${comment.liked ? "text-brand" : "text-slate-500"}`}>
                   {comment.liked ? "♥ Liked" : "♡ Like"} · {comment.reaction_count}
                 </PendingButton>

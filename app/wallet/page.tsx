@@ -44,7 +44,7 @@ export default async function WalletPage() {
         <p className="eyebrow">Games wallet</p>
         <h1 className="text-3xl font-extrabold">Credit balance</h1>
       </header>
-      <section className="card bg-violet-50 dark:bg-violet-950/40">
+      <section className="card border-sky-200 bg-[#E0F2FE] dark:border-slate-700 dark:bg-slate-900">
         <p className="text-sm text-slate-600 dark:text-slate-300">Available balance</p>
         <p className="mt-1 text-4xl font-extrabold">{formatCentavos(balance)}</p>
         <p className="mt-1 text-xs text-slate-500">Balance is stored in PHP centavos (₱1.00 = 100 centavos).</p>
