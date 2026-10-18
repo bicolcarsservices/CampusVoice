@@ -12,3 +12,9 @@ services:
         value: production
       - key: ALLOWED_ORIGINS
         value: https://campus-voice-pi.vercel.app
+      - key: CAMPUS_DOODLE_AUTH_SECRET
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

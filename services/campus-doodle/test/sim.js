@@ -3,6 +3,7 @@
 // Run with: npm test   (uses short timers via TEST_FAST=1 and a throw-away data file)
 process.env.TEST_FAST = '1';
 process.env.ALLOWED_ORIGINS = 'http://localhost:3037';
+process.env.CAMPUS_DOODLE_AUTH_SECRET = 'test-only-campus-doodle-auth-secret';
 const os = require('os'), path = require('path'), fs = require('fs'), crypto = require('crypto'), assert = require('assert');
 process.env.DATA_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cd-')), 'db.json');
 const WebSocket = require('ws');
@@ -19,7 +20,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let port;
 
 class Bot {
-  constructor(name, delay = 0) { this.name = name; this.delay = delay; this.token = crypto.randomBytes(24).toString('hex'); this.msgs = []; this.state = null; this.profile = null; this.errors = []; }
+  constructor(name, delay = 0) { this.name = name; this.delay = delay; this.userId = crypto.randomUUID(); this.msgs = []; this.state = null; this.profile = null; this.errors = []; }
   async connect(hello = true) {
     this.ws = new WebSocket(`ws://localhost:${port}`);
     this.ws.on('message', d => {
@@ -30,7 +31,7 @@ class Bot {
       if (this.onmsg) this.onmsg(m);
     });
     await new Promise(r => this.ws.on('open', r));
-    if (hello) { this.send({ type: 'hello', token: this.token, name: this.name }); await this.waitFor(() => this.profile); }
+    if (hello) { this.send({ type: 'hello', ticket: _test.createTestTicket(this.userId), name: this.name }); await this.waitFor(() => this.profile); }
     return this;
   }
   send(o) { this.ws.send(JSON.stringify(o)); }
@@ -95,10 +96,22 @@ const ledger = () => _test.db.ledger;
     assert.strictEqual(b.errors[0].code, 'unauth');
     b.close();
   });
+  await test('anonymous, invalid, and expired CampusVoice tickets cannot create game profiles', async () => {
+    const b = await new Bot('Unauthorized').connect(false);
+    b.send({ type: 'hello', ticket: 'not-a-signed-ticket' });
+    await b.waitFor(() => b.errors.length);
+    assert.strictEqual(b.errors[0].code, 'bad_ticket');
+    b.errors.length = 0;
+    b.send({ type: 'hello', ticket: _test.createTestTicket(crypto.randomUUID(), -1) });
+    await b.waitFor(() => b.errors.length);
+    assert.strictEqual(b.errors[0].code, 'bad_ticket');
+    b.close();
+  });
 
   await test('Quick Play enters a public lobby immediately and starts when another player joins', async () => {
     const first = await new Bot('Quick One').connect();
     const second = await new Bot('Quick Two').connect();
+    const third = await new Bot('Quick Three').connect();
     try {
       first.send({ type: 'quick_play' });
       const soloLobby = await first.waitFor(() => first.state && first.state.publicMatch && first.state.state === 'WAITING' && first.state);
@@ -117,15 +130,32 @@ const ledger = () => _test.db.ledger;
       assert.strictEqual(firstState.code, secondState.code);
       assert.strictEqual(firstState.players.length, 2);
       assert.notStrictEqual(firstState.you, secondState.you);
+      assert.strictEqual(firstState.match.endless, true);
+      assert.strictEqual(firstState.match.rounds, null);
+      assert.strictEqual(firstState.match.totalTurns, null);
+      const matchRoom = _test.rooms.get(firstState.code);
+      third.send({ type: 'quick_play' });
+      const thirdState = await third.waitFor(() => third.state && third.state.code === firstState.code && third.state);
+      assert.strictEqual(thirdState.players.length, 3, 'Quick Play should admit players during an endless match');
+      const roundLimit = thirdState.config.rounds * matchRoom.match.order.length;
+      matchRoom.match.pointer = roundLimit;
+      assert.ok(_test.peek(matchRoom) >= roundLimit, 'public turns must continue past the configured round limit');
+      matchRoom.match.pointer = 0;
+      const recordedMatches = _test.db.matches.length;
+      const rewardLedger = ledger().length;
       first.send({ type: 'leave_room' });
+      await first.waitFor(() => first.msgs.find(m => m.type === 'left'));
       second.send({ type: 'leave_room' });
-      await Promise.all([
-        first.waitFor(() => first.msgs.find(m => m.type === 'left')),
-        second.waitFor(() => second.msgs.find(m => m.type === 'left'))
-      ]);
+      await second.waitFor(() => second.msgs.find(m => m.type === 'left'));
+      await third.waitFor(() => third.state && third.state.state === 'WAITING');
+      assert.strictEqual(_test.db.matches.length, recordedMatches, 'leaving Quick Play must not finalize a rewarded match');
+      assert.strictEqual(ledger().length, rewardLedger, 'leaving Quick Play must not award Coins');
+      third.send({ type: 'leave_room' });
+      await third.waitFor(() => third.msgs.find(m => m.type === 'left'));
     } finally {
       first.close();
       second.close();
+      third.close();
     }
   });
 
@@ -233,9 +263,9 @@ const ledger = () => _test.db.ledger;
     const { bots } = await makeRoom(['R1', 'R2', 'R3']);
     const g = {}; autoplay(bots, g); bots[0].send({ type: 'start_match' });
     await bots[0].waitFor(() => bots[0].state.state === 'DRAWING');
-    const victim = bots[2], tok = victim.token; victim.close();
+    const victim = bots[2], userId = victim.userId; victim.close();
     await bots[0].waitFor(() => bots[0].state.players.some(p => !p.connected));
-    const back = new Bot('R3'); back.token = tok; await back.connect();
+    const back = new Bot('R3'); back.userId = userId; await back.connect();
     await back.waitFor(() => back.state && back.state.players.length === 3);
     assert.ok(back.state.players.find(p => p.id === back.state.you).connected);
     bots.forEach(b => b.close()); back.close();

@@ -1,5 +1,21 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
+const envFile = path.join(__dirname, '..', '..', '.env.local');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*(?:export\s+)?(CAMPUS_DOODLE_AUTH_SECRET|SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_SUPABASE_URL)\s*=\s*(.*?)\s*$/);
+    if (!match) continue;
+    const key = match[1] === 'NEXT_PUBLIC_SUPABASE_URL' ? 'SUPABASE_URL' : match[1];
+    if (process.env[key]) continue;
+    let value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    process.env[key] = value;
+  }
+}
+
 process.env.PORT = process.env.PORT || '3101';
 process.env.ALLOWED_ORIGINS = [...new Set([
   'http://localhost:3000',

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import CampusDoodleFrame from "@/components/games/CampusDoodleFrame";
+import { createClient, getAuthUser } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +27,11 @@ function getCampusDoodleUrl() {
   return parsedUrl.origin;
 }
 
-export default function CampusDoodlePage() {
+export default async function CampusDoodlePage() {
+  const { user, error } = await getAuthUser(createClient());
+  if (error) throw new Error(`Could not verify your login: ${error.message}`);
+  if (!user) redirect("/login?next=%2Fgames%2Fcampus-doodle");
+
   const gameUrl = getCampusDoodleUrl();
 
   return (
@@ -37,15 +44,10 @@ export default function CampusDoodlePage() {
         <Link href="/games" className="btn-ghost">All games</Link>
       </header>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Draw clues and guess with friends in real time. No CampusVoice subscription is required.
+        Draw clues and guess with friends in real time. Log in to your CampusVoice account to play and keep your Coins; no subscription is required.
       </p>
       {gameUrl ? (
-        <iframe
-          title="Campus Doodle free multiplayer game"
-          src={gameUrl}
-          className="h-[82vh] min-h-[680px] w-full rounded-xl border border-slate-300 bg-slate-950 dark:border-slate-700"
-          allow="fullscreen; clipboard-write"
-        />
+        <CampusDoodleFrame gameUrl={gameUrl} />
       ) : (
         <aside role="status" className="card">
           <h2 className="font-bold">Campus Doodle is not connected yet</h2>

@@ -16,14 +16,32 @@ const SIZES = [2, 4, 8, 14, 22, 34];
 
 /* ───────── session ───────── */
 function newToken() { const a = new Uint8Array(24); crypto.getRandomValues(a); return [...a].map(b => b.toString(16).padStart(2, '0')).join(''); }
-let token = localStorage.getItem('cd_token'); if (!token) { token = newToken(); localStorage.setItem('cd_token', token); }
 let myName = localStorage.getItem('cd_name') || '';
+let ticket = null;
 let ws, retry = 0, profile = null, catalog = [], limits = null;
 let room = null, view = 'home', skew = 0, seenTurn = -2, seenState = '';
 let boardView = 'weekly', boardPage = 1, pendingKeys = {};
 
 function toast(msg, bad) { const t = h('div', { class: 'toast' + (bad ? ' bad' : ''), text: msg }); $('#toasts').append(t); setTimeout(() => t.remove(), 3500); }
 function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function requestTicket() {
+  if (window.parent !== window && parentOrigin) {
+    window.parent.postMessage({ type: 'campus-doodle-auth-request' }, parentOrigin);
+  } else if (window.parent === window) {
+    $('#banner').textContent = 'Open Campus Doodle from your logged-in CampusVoice account to play.';
+    $('#banner').hidden = false;
+  }
+}
+const parentOrigin = (() => {
+  try { return document.referrer ? new URL(document.referrer).origin : null; }
+  catch (_) { return null; }
+})();
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.origin !== parentOrigin ||
+      event.data?.type !== 'campus-doodle-ticket' || typeof event.data.ticket !== 'string') return;
+  ticket = event.data.ticket;
+  if (ws && ws.readyState === 1) send({ type: 'hello', ticket, name: myName || undefined });
+});
 async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -41,7 +59,11 @@ async function copy(text) {
 
 function connect() {
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
-  ws.onopen = () => { retry = 0; $('#dot').classList.add('on'); $('#banner').hidden = true; send({ type: 'hello', token, name: myName || undefined }); };
+  ws.onopen = () => {
+    retry = 0; $('#dot').classList.add('on'); $('#banner').hidden = true;
+    if (ticket) send({ type: 'hello', ticket, name: myName || undefined });
+    else requestTicket();
+  };
   ws.onclose = () => { $('#dot').classList.remove('on'); if (!replaced) { $('#banner').hidden = false; setTimeout(connect, Math.min(8000, 500 * 2 ** retry++)); } };
   ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } onMsg(m); };
 }
@@ -62,12 +84,12 @@ function onMsg(m) {
       document.body.classList.remove('in-room');
       setView('home');
       break;
-    case 'error': toast(m.message, true); break;
+    case 'error': toast(m.message, true); if (m.code === 'bad_ticket') requestTicket(); break;
     case 'replaced': replaced = true; $('#banner').textContent = 'Opened in another tab. Reload to play here.'; $('#banner').hidden = false; break;
     case 'leaderboard': renderBoard(m); break;
     case 'shop': renderShop(m); break;
     case 'history': renderHistory(m.matches); break;
-    case 'buy_result': delete pendingKeys[m.itemId]; if (m.ok) toast(m.repeated ? 'Already purchased.' : 'Purchased!'); else toast(m.message, true); break;
+    case 'buy_result': if (m.ok) { delete pendingKeys[m.itemId]; toast(m.repeated ? 'Already purchased.' : 'Purchased!'); } else toast(m.message, true); break;
     default:
   }
 }
@@ -96,12 +118,14 @@ function initHome() {
     t.value = limits.drawTime.def;
   }
   const rw = limits.rewards;
-  $('#reward-note').textContent = `Match rewards: 1st ${rw[1]}, 2nd ${rw[2]}, 3rd ${rw[3]}, 4th ${rw[4]} Coins. Matches need ${limits.rewardMinPlayers}+ players to pay out. Rewards are decided by the server.`;
+  $('#reward-note').textContent = `Private match rewards: 1st ${rw[1]}, 2nd ${rw[2]}, 3rd ${rw[3]}, 4th ${rw[4]} Coins. Matches need ${limits.rewardMinPlayers}+ players to pay out. Quick Play is endless and does not award Coins.`;
 }
 $('#name').addEventListener('change', e => {
   const v = e.target.value.trim();
   if (v.length < 2) { toast('Names need at least 2 characters.', true); e.target.value = myName; return; }
-  myName = v; localStorage.setItem('cd_name', v); send({ type: 'hello', token, name: v });
+  myName = v; localStorage.setItem('cd_name', v);
+  if (ticket) send({ type: 'hello', ticket, name: v });
+  else requestTicket();
 });
 $('#create').addEventListener('click', () => send({ type: 'create_room', config: { rounds: +$('#cfg-rounds').value, drawTime: +$('#cfg-time').value } }));
 $('#join').addEventListener('click', () => send({ type: 'join_room', code: $('#code').value }));
@@ -177,7 +201,7 @@ function renderRoom() {
   $('#round').textContent = st === 'WAITING'
     ? room.publicMatch ? 'Quick Play · Waiting' : 'Room ' + room.code
     : room.publicMatch
-      ? st === 'MATCH_FINISHED' ? 'Quick Play · Finished' : t ? `Quick Play · Round ${t.round}/${room.config.rounds}` : 'Quick Play · Starting'
+      ? st === 'MATCH_FINISHED' ? 'Quick Play · Finished' : t ? `Quick Play · Round ${t.round} · Endless` : 'Quick Play · Starting'
       : st === 'MATCH_FINISHED' ? 'Finished' : (t ? `Round ${t.round}/${room.config.rounds}` : 'Starting');
   const hint = $('#hint');
   if (st === 'DRAWING' && t && t.phase === 'drawing') hint.textContent = (t.word ? t.word : (t.hint || []).join(' '));
@@ -236,7 +260,9 @@ function renderOverlay() {
         connected < room.minPlayers ? h('div', { class: 'small', text: `Need at least ${room.minPlayers} players.` }) : null);
     } else if (!room.publicMatch) ov.append(h('div', { text: `${room.config.rounds} rounds, ${room.config.drawTime}s each. Waiting for the host to start.` }));
     ov.append(h('button', { class: 'btn small', onclick: leave }, room.publicMatch ? 'Leave Quick Play' : 'Leave room'),
-      h('div', { class: 'small', text: `Coins are awarded only when ${room.rewardMinPlayers}+ players finish the match.` }));
+      h('div', { class: 'small', text: room.publicMatch
+        ? 'Quick Play has endless rounds and does not award Coins.'
+        : `Coins are awarded only when ${room.rewardMinPlayers}+ players finish the match.` }));
   } else if (st === 'STARTING') {
     ov.append(h('h2', { text: 'Get ready…' }));
   } else if (st === 'DRAWING' && t.phase === 'choosing') {
