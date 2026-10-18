@@ -14,7 +14,6 @@
   <button class="brand" id="brand" aria-label="Campus Doodle home">Campus Doodle</button>
   <nav class="nav" aria-label="Main">
     <button data-view="home" class="active">Play</button>
-    <button data-view="practice">Practice vs AI</button>
     <button data-view="board">Leaderboard</button>
     <button data-view="shop">Shop</button>
     <button data-view="inventory">Inventory</button>
@@ -23,6 +22,7 @@
   <div class="status">
     <span class="dot" id="dot" title="Connection"></span>
     <span class="coins" id="coins" title="Your Coins">0 Coins</span>
+    <button class="btn small" id="fullscreen" type="button" aria-label="Enter full screen">Full screen</button>
   </div>
 </header>
 <div id="banner" class="banner" role="status" hidden>Reconnecting…</div>
@@ -31,10 +31,17 @@
   <section id="v-home" class="view">
     <div class="hero card">
       <h1>Draw it. Guess it. Win Coins.</h1>
-      <p class="muted">Play with friends in a private room, or practice solo against AI. Multiplayer matches can earn Coins.</p>
+      <p class="muted">Play with friends in a private room or join strangers with Quick Play. No account is required.</p>
       <label class="field">Your name
         <input id="name" maxlength="16" autocomplete="off" placeholder="2–16 letters or numbers">
       </label>
+      <div class="quick-play panel">
+        <div>
+          <h2>Play with random players</h2>
+          <p class="muted small">Enter a public game right away—no room code or invite needed. Wait for other players to join automatically.</p>
+        </div>
+        <button class="btn primary" id="quick-play" type="button">Quick Play</button>
+      </div>
       <div class="split">
         <div class="panel">
           <h2>Create a room</h2>
@@ -55,53 +62,6 @@
         </div>
       </div>
       <p class="muted small" id="reward-note"></p>
-    </div>
-  </section>
-
-  <section id="v-practice" class="view" hidden>
-    <div class="hero card practice-card">
-      <p class="eyebrow">Solo practice · Free local AI</p>
-      <h1>Practice with AI</h1>
-      <p class="muted">Take turns drawing and guessing. Each round has one AI drawing for you to guess and one drawing from you for AI to guess. One word per drawing turn.</p>
-      <p class="muted small">Choose 1–6 rounds and a timer for each drawing turn. AI runs locally through Ollama, so there is no API key or per-request fee. Ollama and its vision model must be installed on the same computer as the game service. Practice does not earn multiplayer Coins.</p>
-      <div id="practice-setup" class="panel practice-setup">
-        <label class="field">Rounds
-          <select id="practice-rounds"></select>
-        </label>
-        <label class="field">Time per turn
-          <select id="practice-time"></select>
-        </label>
-        <button class="btn primary" id="practice-start">Start practice</button>
-        <p class="muted small" id="practice-error" role="alert"></p>
-      </div>
-      <div id="practice-game" hidden>
-        <div class="bar card">
-          <span id="practice-round-label" class="pill"></span>
-          <span id="practice-status" class="muted" aria-live="polite"></span>
-          <span id="practice-timer" class="pill timer" role="timer" aria-label="Time remaining" aria-live="off">–</span>
-          <span id="practice-score" class="pill">0 correct</span>
-        </div>
-        <p id="practice-prompt" class="practice-prompt" aria-live="polite"></p>
-        <div id="practice-choices" class="choices practice-choices"></div>
-        <form id="practice-guess-form" class="practice-guess" hidden>
-          <label class="field">Type your guess
-            <input id="practice-guess" maxlength="50" autocomplete="off" placeholder="Enter your guess">
-          </label>
-          <button class="btn primary" type="submit">Submit guess</button>
-        </form>
-        <div class="board-wrap practice-board">
-          <canvas id="practice-canvas" width="800" height="500" aria-label="Practice drawing canvas"></canvas>
-        </div>
-        <div id="practice-tools" class="tools card" hidden>
-          <div class="swatches" id="practice-swatches" role="radiogroup" aria-label="Practice drawing colour"></div>
-          <div class="sizes" id="practice-sizes" role="radiogroup" aria-label="Practice brush size"></div>
-          <button class="btn small" id="practice-eraser" aria-pressed="false">Eraser</button>
-          <button class="btn small" id="practice-clear">Clear</button>
-          <button class="btn primary" id="practice-submit">Ask AI to guess</button>
-        </div>
-        <div id="practice-result" class="practice-result" role="status" aria-live="polite"></div>
-        <button class="btn primary" id="practice-next" hidden>Continue</button>
-      </div>
     </div>
   </section>
 

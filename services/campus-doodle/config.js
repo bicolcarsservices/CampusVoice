@@ -34,6 +34,7 @@ module.exports = {
   ROOM_TTL_MS: 3 * 3600 * 1000,
 
   ROOM_CREATE_LIMIT: { count: 5, windowMs: 10 * 60 * 1000 },
+  PUBLIC_START_DELAY_MS: 1500,
 
   // Shop catalog (authoritative). All cosmetic, none affect gameplay.
   ITEMS: [

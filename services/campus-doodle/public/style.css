@@ -18,6 +18,7 @@ button{cursor:pointer}
 .nav button{background:none;border:0;color:#cfd8f0;padding:8px 12px;border-radius:999px;font-weight:600}
 .nav button.active,.nav button:hover{background:#fff;color:var(--ink)}
 .status{display:flex;align-items:center;gap:10px}
+.status .btn{color:var(--ink);white-space:nowrap}
 .dot{width:10px;height:10px;border-radius:50%;background:#e63946}
 .dot.on{background:#3ddc97}
 .coins{background:var(--sun);color:var(--ink);font-weight:800;padding:6px 12px;border-radius:999px}
@@ -25,19 +26,6 @@ button{cursor:pointer}
 main{padding:18px;max-width:1280px;margin:0 auto}
 .card{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:16px}
 .hero{max-width:760px;margin:24px auto;box-shadow:6px 6px 0 var(--ink)}
-.practice-card{max-width:900px}
-.practice-setup{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-top:16px}
-.practice-setup .field{min-width:180px;flex:1}
-.practice-setup .small{flex-basis:100%;margin:0}
-.practice-prompt{min-height:28px;margin:14px 0;font-weight:700}
-.practice-choices{min-height:44px;margin:10px 0}
-.practice-board{max-width:800px;margin:0 auto;width:100%}
-.practice-guess{display:flex;align-items:end;gap:10px;max-width:800px;margin:14px auto}
-.practice-guess .field{flex:1}
-.practice-result{min-height:24px;margin:10px 0;font-weight:700}
-.practice-result.good{color:#087a5b}
-.practice-result.bad{color:#b3123f}
-#practice-next{display:block;margin:12px auto}
 .wide{max-width:900px;margin:0 auto}
 h1{font-size:clamp(28px,5vw,42px);line-height:1.05;margin:0 0 8px;font-weight:800}
 h2{font-size:20px;margin:0 0 10px}
@@ -47,6 +35,9 @@ h2{font-size:20px;margin:0 0 10px}
 .code-input{text-transform:uppercase;letter-spacing:.3em;font-weight:800;text-align:center}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
 .panel{border:2px dashed var(--ink);border-radius:12px;padding:14px}
+.quick-play{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;background:#f8fbff}
+.quick-play h2{margin-bottom:4px}
+.quick-play p{margin:0}
 .btn{border:2px solid var(--line);background:#fff;border-radius:999px;padding:10px 18px;font-weight:700}
 .btn:hover{background:var(--sun)}
 .btn.primary{background:var(--pink);color:#fff;box-shadow:3px 3px 0 var(--ink)}
@@ -54,6 +45,7 @@ h2{font-size:20px;margin:0 0 10px}
 .btn.small{padding:6px 12px;font-size:14px}
 .btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 .game{display:grid;grid-template-columns:220px minmax(0,1fr) 300px;gap:14px;align-items:start}
+body.in-room main{max-width:none}
 .players ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .pl{display:flex;gap:10px;align-items:center;padding:6px;border-radius:10px}
 .pl.artist{background:#fff3b0}.pl.guessed{background:#d7f7ec}.pl.off{opacity:.45}
@@ -123,8 +115,41 @@ table.t{width:100%;border-collapse:collapse}
   .nav{order:3;flex-basis:100%;overflow-x:auto;flex-wrap:nowrap}
   .nav button{white-space:nowrap}
   main{padding:12px}
-  .practice-guess{align-items:stretch;flex-wrap:wrap}
-  .practice-guess .field{flex-basis:100%}
-  .practice-card .bar{justify-content:flex-start;flex-wrap:wrap}
+  .quick-play{align-items:flex-start;flex-direction:column}
+}
+@media (max-width:980px) and (orientation:landscape){
+  .top{gap:8px;padding:5px 10px;flex-wrap:nowrap}
+  .brand{font-size:24px;white-space:nowrap}
+  .nav{display:none}
+  .status{margin-left:auto}
+  body.in-room main{padding:6px}
+  .game{grid-template-columns:minmax(110px,18vw) minmax(0,1fr) minmax(170px,24vw);gap:8px;align-items:stretch}
+  .players ul{flex-direction:column;max-height:calc(100dvh - 150px);overflow-y:auto}
+  .pl{min-width:0;padding:4px;gap:5px}
+  .av{width:30px;height:30px}
+  .stage{min-height:0}
+  .board-wrap{flex:1;min-height:180px;aspect-ratio:auto}
+  .chat{height:calc(100dvh - 135px);min-height:180px;padding:7px}
+  .bar{gap:5px;padding:5px}
+  .hint{font-size:20px;letter-spacing:.08em}
+}
+:fullscreen{background:var(--paper)}
+:fullscreen body{height:100dvh;min-height:0;overflow:hidden}
+:fullscreen .top{height:48px;padding:4px 12px;flex-wrap:nowrap}
+:fullscreen .nav{display:none}
+:fullscreen main{height:calc(100dvh - 48px);max-width:none;padding:8px;overflow:auto}
+:fullscreen body.in-room main{overflow:hidden}
+:fullscreen #v-room{height:100%}
+:fullscreen .game{height:100%;grid-template-columns:minmax(150px,18vw) minmax(0,1fr) minmax(220px,25vw);align-items:stretch}
+:fullscreen .stage{height:100%;min-height:0}
+:fullscreen .board-wrap{flex:1;min-height:0;aspect-ratio:auto}
+:fullscreen .chat{height:100%;min-height:0}
+:fullscreen .players{overflow:auto}
+:fullscreen .players ul{max-height:100%;overflow:auto}
+@media (orientation:portrait){
+  :fullscreen .game{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) minmax(130px,20dvh)}
+  :fullscreen .players ul{flex-direction:row;overflow-x:auto}
+  :fullscreen .players .pl{flex:none;min-width:135px}
+  :fullscreen .chat{height:auto;min-height:0}
 }
 @media (prefers-reduced-motion:no-preference){.toast{animation:pop .18s ease-out}@keyframes pop{from{transform:translateY(8px);opacity:0}}}

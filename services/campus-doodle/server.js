@@ -122,6 +122,8 @@ const playerRoom = new Map();   // playerId -> code
 const sockets = new Map();      // playerId -> ws
 const clients = new Map();      // ws -> ctx
 const createLog = new Map();    // playerId -> [timestamps]
+let publicRoom = null;
+const publicStartTimers = new Map();
 
 function send(ws, obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 function sendTo(id, obj) { send(sockets.get(id), obj); }
@@ -178,6 +180,7 @@ function snapshot(room, viewerId) {
   }
   return {
     code: room.code, state: room.state, hostId: room.hostId, you: viewerId, config: room.config,
+    publicMatch: room.publicMatch === true,
     minPlayers: C.MIN_PLAYERS_TO_START, rewardMinPlayers: C.MIN_PLAYERS_FOR_REWARD, rewards: C.REWARDS,
     deadline: room.deadline, serverNow: now(), players, turn,
     match: m ? { rounds: m.rounds, turnsDone: m.turnsCompleted, totalTurns: m.rounds * m.order.length } : null,
@@ -217,7 +220,16 @@ function removeFromRoom(room, id, { forfeit }) {
   if (forfeit) { p.left = true; p.connected = false; } else room.players.delete(id);
   sys(room, `${p.name} left.`);
   if (room.hostId === id) reassignHost(room);
-  if (room.players.size === 0 || [...room.players.values()].every(x => x.left)) { rooms.delete(room.code); return; }
+  if (room.players.size === 0 || [...room.players.values()].every(x => x.left)) {
+    rooms.delete(room.code);
+    if (publicRoom === room) {
+      publicRoom = null;
+    }
+    const startTimer = publicStartTimers.get(room);
+    if (startTimer) clearTimeout(startTimer);
+    publicStartTimers.delete(room);
+    return;
+  }
   broadcastState(room);
 }
 
@@ -440,6 +452,10 @@ function sweep() {
       if (anyone) room.emptySince = null; else room.emptySince = room.emptySince || t;
       if ((room.emptySince && t - room.emptySince > C.ROOM_IDLE_MS) || t - room.createdAt > C.ROOM_TTL_MS) {
         for (const p of room.players.values()) if (playerRoom.get(p.id) === room.code) playerRoom.delete(p.id);
+        if (publicRoom === room) publicRoom = null;
+        const startTimer = publicStartTimers.get(room);
+        if (startTimer) clearTimeout(startTimer);
+        publicStartTimers.delete(room);
         rooms.delete(room.code); continue;
       }
       tickRoom(room, t);
@@ -449,6 +465,50 @@ function sweep() {
 
 /* ────────────────────────────── client actions ────────────────────────────── */
 function roomOf(ctx) { const c = playerRoom.get(ctx.id); return c ? rooms.get(c) : null; }
+
+function schedulePublicStart(room) {
+  if (publicStartTimers.has(room) || room.state !== 'WAITING'
+    || connectedPlayers(room).length < C.MIN_PLAYERS_TO_START) return;
+  const startTimer = setTimeout(() => {
+    publicStartTimers.delete(room);
+    if (room.state !== 'WAITING') return;
+    if (connectedPlayers(room).length < C.MIN_PLAYERS_TO_START) {
+      if (!publicRoom || publicRoom.state !== 'WAITING' || publicRoom.players.size >= C.MAX_PLAYERS) publicRoom = room;
+      return;
+    }
+    if (publicRoom === room) publicRoom = null;
+    startMatch(room);
+  }, C.PUBLIC_START_DELAY_MS);
+  publicStartTimers.set(room, startTimer);
+  if (typeof startTimer.unref === 'function') startTimer.unref();
+}
+function createPublicRoom(ctx) {
+  const room = {
+    code: genCode(), hostId: ctx.id, state: 'WAITING', deadline: 0,
+    config: cleanConfig({ rounds: C.ROUNDS.def, drawTime: C.DRAW_TIME.def }),
+    players: new Map(), match: null, turn: null, next: null, result: null, chat: [],
+    createdAt: now(), emptySince: null, lowSince: null, finalizeRetry: null, publicMatch: true
+  };
+  rooms.set(room.code, room);
+  addPlayer(room, ctx.id, db.players[ctx.id].name);
+  publicRoom = room;
+  send(ctx.ws, { type: 'chatlog', msgs: [] });
+  broadcastState(room);
+  return room;
+}
+function onQuickPlay(ctx) {
+  if (roomOf(ctx)) return err(ctx, 'Leave your current room first.');
+  let room = publicRoom;
+  if (!room || !rooms.has(room.code) || room.state !== 'WAITING' || room.players.size >= C.MAX_PLAYERS) {
+    createPublicRoom(ctx);
+    return;
+  }
+  const p = addPlayer(room, ctx.id, db.players[ctx.id].name);
+  send(ctx.ws, { type: 'chatlog', msgs: room.chat });
+  sys(room, `${p.name} joined Quick Play.`);
+  broadcastState(room);
+  schedulePublicStart(room);
+}
 
 function onHello(ctx, msg) {
   if (typeof msg.token !== 'string' || !/^[a-f0-9]{32,64}$/.test(msg.token)) return err(ctx, 'Invalid session.', 'bad_token');
@@ -666,134 +726,6 @@ function history(id) {
 const PUBLIC = path.join(__dirname, 'public');
 const FILES = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/app.js': 'app.js' };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
-const PRACTICE_BODY_LIMIT = 1024 * 1024;
-const PRACTICE_IMAGE_LIMIT = 700 * 1024;
-
-function json(res, status, value) {
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-  res.end(JSON.stringify(value));
-}
-
-async function requestBody(req) {
-  let body = '';
-  for await (const chunk of req) {
-    body += chunk;
-    if (body.length > PRACTICE_BODY_LIMIT) throw Object.assign(new Error('Request body is too large.'), { status: 413 });
-  }
-  try { return JSON.parse(body); } catch (_) { throw Object.assign(new Error('Invalid JSON body.'), { status: 400 }); }
-}
-
-function imageData(value) {
-  if (typeof value !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) return null;
-  const encoded = value.slice('data:image/png;base64,'.length);
-  if (encoded.length > Math.ceil(PRACTICE_IMAGE_LIMIT * 4 / 3)) return null;
-  const bytes = Buffer.from(encoded, 'base64');
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-  if (bytes.length < 24 || bytes.length > PRACTICE_IMAGE_LIMIT || !bytes.subarray(0, 8).equals(signature)
-    || bytes.toString('ascii', 12, 16) !== 'IHDR') return null;
-  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20);
-  return width > 0 && width <= 2048 && height > 0 && height <= 2048 ? value : null;
-}
-
-function practiceWord(value, choices) {
-  if (typeof value !== 'string') return null;
-  const normal = value.trim().toLocaleLowerCase('en-US');
-  return choices.find(word => word.toLocaleLowerCase('en-US') === normal) || null;
-}
-
-function validStrokes(value) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > 32) return false;
-  return value.every(stroke => stroke && Number.isInteger(stroke.c) && stroke.c >= 0 && stroke.c < 16
-    && Number.isInteger(stroke.s) && stroke.s >= 0 && stroke.s < 6
-    && typeof stroke.e === 'boolean'
-    && Array.isArray(stroke.pts) && stroke.pts.length >= 1 && stroke.pts.length <= 40
-    && stroke.pts.every(point => Array.isArray(point) && point.length === 2
-      && point.every(n => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1)));
-}
-
-function ollamaConfig() {
-  const baseUrl = new URL(process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434');
-  if (!['http:', 'https:'].includes(baseUrl.protocol) || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
-    throw Object.assign(new Error('OLLAMA_BASE_URL must be an HTTP(S) URL without credentials or query parameters.'), { status: 500 });
-  }
-  return { baseUrl, model: process.env.OLLAMA_VISION_MODEL || 'qwen2.5vl:3b' };
-}
-
-async function ollamaRequest(endpoint, options) {
-  const { baseUrl } = ollamaConfig();
-  let response;
-  try {
-    response = await fetch(new URL(endpoint, baseUrl), {
-      ...options,
-      signal: AbortSignal.timeout(120_000)
-    });
-  } catch (error) {
-    console.error('Ollama practice request failed:', error.message);
-    throw Object.assign(new Error('Cannot connect to local Ollama. Start Ollama and make sure the vision model is installed.'), { status: 503 });
-  }
-  if (!response.ok) {
-    let detail = '';
-    try { detail = (await response.json()).error || ''; } catch (_) { /* Ollama may return non-JSON errors. */ }
-    console.error('Ollama practice request returned HTTP', response.status, detail);
-    if (response.status === 404) {
-      throw Object.assign(new Error('The Ollama vision model was not found. Run `ollama pull qwen2.5vl:3b` or set OLLAMA_VISION_MODEL to a model you have installed.'), { status: 503 });
-    }
-    throw Object.assign(new Error('Local Ollama could not complete this turn. Check that Ollama is running and try again.'), { status: 502 });
-  }
-  try {
-    return await response.json();
-  } catch (_) {
-    throw Object.assign(new Error('Ollama returned an unreadable response.'), { status: 502 });
-  }
-}
-
-async function ollamaStatus() {
-  const { model } = ollamaConfig();
-  try {
-    const data = await ollamaRequest('/api/tags');
-    const installed = Array.isArray(data.models) && data.models.some(entry => entry.name === model || entry.model === model);
-    return installed
-      ? { available: true, provider: 'ollama', model }
-      : { available: false, provider: 'ollama', model, message: `Ollama is running, but ${model} is not installed. Open PowerShell and run: ollama pull ${model}` };
-  } catch (error) {
-    if (!error.status) throw error;
-    return { available: false, provider: 'ollama', model, message: error.message };
-  }
-}
-
-async function ollamaPractice(prompt, image, choices) {
-  const { model } = ollamaConfig();
-  const userMessage = { role: 'user', content: prompt };
-  if (image) userMessage.images = [image.slice(image.indexOf(',') + 1)];
-  const data = await ollamaRequest('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: 'Return only a valid JSON object matching the requested fields. Follow the user prompt exactly.' },
-        userMessage
-      ],
-      format: 'json',
-      stream: false,
-      options: { temperature: 0.2, num_predict: image ? 100 : 1600 }
-    })
-  });
-  const content = data && data.message && data.message.content;
-  try {
-    const parsed = JSON.parse(content);
-    if (image) {
-      if (typeof parsed.word !== 'string' || !parsed.word.trim() || parsed.word.trim().length > 40) throw new Error('Invalid practice guess.');
-      return { word: parsed.word.trim() };
-    }
-    const word = practiceWord(parsed.word, choices);
-    if (!word || !validStrokes(parsed.strokes)) throw new Error('Invalid practice drawing.');
-    return { word, strokes: parsed.strokes };
-  } catch (_) {
-    throw Object.assign(new Error('Ollama returned an invalid answer. Try again or use another vision model.'), { status: 502 });
-  }
-}
-
 function start(port = C.PORT) {
   const allowed = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
@@ -809,58 +741,13 @@ function start(port = C.PORT) {
     })
     .filter(Boolean);
   const frameAncestors = ["'self'", ...allowed].join(' ');
-  const practiceLimits = new Map();
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
     const headers = {
       'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-      'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors ${frameAncestors}`
+      'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' ws: wss:; img-src 'self'; frame-ancestors ${frameAncestors}`
     };
     if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
-    if (url === '/api/words' && req.method === 'GET') return json(res, 200, { words: WORDS });
-    if (url === '/api/ai/status' && req.method === 'GET') {
-      ollamaStatus().then(status => json(res, 200, status)).catch(error => {
-        console.error('Could not check Ollama status:', error);
-        json(res, 500, { available: false, provider: 'ollama', message: error.message });
-      });
-      return;
-    }
-    if (url === '/api/ai/draw' || url === '/api/ai/guess') {
-      if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed.' });
-      const origin = req.headers.origin;
-      if (origin) {
-        try {
-          const parsed = new URL(origin);
-          if (parsed.host !== req.headers.host && !allowed.includes(parsed.origin)) return json(res, 403, { error: 'Origin not allowed.' });
-        } catch (_) { return json(res, 403, { error: 'Origin not allowed.' }); }
-      }
-      const ip = req.socket.remoteAddress || '?';
-      let limit = practiceLimits.get(ip);
-      if (!limit || limit.resetAt <= Date.now()) {
-        limit = { count: 0, resetAt: Date.now() + 10 * 60 * 1000 };
-        practiceLimits.set(ip, limit);
-      }
-      if (limit.count >= 30) return json(res, 429, { error: 'Practice AI is busy. Please try again later.' });
-      limit.count++;
-      requestBody(req).then(async body => {
-        const isDraw = url.endsWith('/draw');
-        const choices = body && body.choices;
-        if (isDraw && (!Array.isArray(choices) || choices.length !== 3
-          || choices.some(word => typeof word !== 'string' || word.length > 40 || !WORDS.includes(word))
-          || new Set(choices).size !== 3)) return json(res, 400, { error: 'Choose three different words from the practice word bank.' });
-        const image = isDraw ? null : imageData(body && body.image);
-        if (!isDraw && !image) return json(res, 400, { error: 'A valid PNG drawing is required.' });
-        const prompt = isDraw
-          ? `Choose exactly one of these easy-to-draw words: ${JSON.stringify(choices)}. Create a clear, simple drawing using 1 to 24 strokes. Each stroke has c (colour index 0-15), s (brush size index 0-5), e (boolean eraser), and pts (1-30 [x,y] coordinate pairs normalized from 0 to 1). Return JSON only: {"word":"exact choice","strokes":[{"c":0,"s":2,"e":false,"pts":[[0.2,0.3],[0.4,0.5]]}]}. Avoid letters, words, and numbers in the drawing.`
-          : 'Look at the drawing and guess what it depicts. Do not ask for or use a list of choices. Return one short word or simple phrase as your best guess in JSON only: {"word":"your guess"}.';
-        const result = await ollamaPractice(prompt, image, isDraw ? choices : null);
-        json(res, 200, result);
-      }).catch(error => {
-        if (!error.status) console.error('Unexpected AI practice error:', error);
-        json(res, error.status || 500, { error: error.status ? error.message : 'AI practice failed unexpectedly.' });
-      });
-      return;
-    }
     const f = FILES[url];
     if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
     fs.readFile(path.join(PUBLIC, f), (e, buf) => {
@@ -905,7 +792,13 @@ function start(port = C.PORT) {
   });
   const hb = setInterval(() => { for (const ws of wss.clients) { if (ws.isAlive === false) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch (_) { /* ignore */ } } }, 25000);
   const ticker = setInterval(sweep, 250);
-  server.on('close', () => { clearInterval(hb); clearInterval(ticker); wss.close(); });
+  server.on('close', () => {
+    clearInterval(hb);
+    clearInterval(ticker);
+    for (const timer of publicStartTimers.values()) clearTimeout(timer);
+    publicStartTimers.clear();
+    wss.close();
+  });
   return new Promise(resolve => server.listen(port, () => resolve(server)));
 }
 
@@ -915,6 +808,7 @@ function route(ctx, msg) {
   if (msg.type === 'draw') { if (!take(ctx.draw)) { ctx.violations++; return; } return onDraw(ctx, msg); }
   if (!take(ctx.general)) { ctx.violations++; return; }
   switch (msg.type) {
+    case 'quick_play': return onQuickPlay(ctx);
     case 'create_room': return onCreate(ctx, msg);
     case 'join_room': return onJoin(ctx, msg);
     case 'leave_room': return onLeave(ctx);
@@ -951,7 +845,7 @@ if (require.main === module) {
 module.exports = {
   start,
   _test: {
-    rooms, get db() { return db; }, finalizeMatch, buy, snapshot, tx,
+    rooms, get publicRoom() { return publicRoom; }, get db() { return db; }, finalizeMatch, buy, snapshot, tx,
     setFailSave(v) { failSave = v; }
   }
 };

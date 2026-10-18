@@ -57,7 +57,11 @@ function onMsg(m) {
     case 'draw': drawStroke(m.stroke); break;
     case 'clear': clearCanvas(); break;
     case 'replay': clearCanvas(); m.strokes.forEach(drawStroke); break;
-    case 'left': room = null; seenTurn = -2; setView('home'); break;
+    case 'left':
+      room = null; seenTurn = -2;
+      document.body.classList.remove('in-room');
+      setView('home');
+      break;
     case 'error': toast(m.message, true); break;
     case 'replaced': replaced = true; $('#banner').textContent = 'Opened in another tab. Reload to play here.'; $('#banner').hidden = false; break;
     case 'leaderboard': renderBoard(m); break;
@@ -72,7 +76,8 @@ function updateCoins() { if (profile) $('#coins').textContent = profile.coins + 
 /* ───────── views ───────── */
 function setView(v) {
   view = v;
-  for (const id of ['home', 'practice', 'room', 'board', 'shop', 'inventory', 'history']) $('#v-' + id).hidden = id !== (v === 'home' && room ? 'room' : v);
+  document.body.classList.toggle('in-room', Boolean(room) && v === 'home');
+  for (const id of ['home', 'room', 'board', 'shop', 'inventory', 'history']) $('#v-' + id).hidden = id !== (v === 'home' && room ? 'room' : v);
   $$('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
   if (v === 'board') send({ type: 'leaderboard', view: boardView, page: boardPage });
   if (v === 'shop' || v === 'inventory') send({ type: 'shop_list' });
@@ -154,6 +159,7 @@ function titleOf(p) { const t = p.cos && p.cos.title && catalog.find(i => i.id =
 
 function renderRoom() {
   if (!room) return;
+  document.body.classList.toggle('in-room', view === 'home');
   $('#v-room').hidden = view !== 'home';
   $('#v-home').hidden = !!room && view === 'home';
   // players
@@ -168,7 +174,11 @@ function renderRoom() {
   }
   // top bar
   const t = room.turn, st = room.state;
-  $('#round').textContent = st === 'WAITING' ? 'Room ' + room.code : st === 'MATCH_FINISHED' ? 'Finished' : (t ? `Round ${t.round}/${room.config.rounds}` : 'Starting');
+  $('#round').textContent = st === 'WAITING'
+    ? room.publicMatch ? 'Quick Play · Waiting' : 'Room ' + room.code
+    : room.publicMatch
+      ? st === 'MATCH_FINISHED' ? 'Quick Play · Finished' : t ? `Quick Play · Round ${t.round}/${room.config.rounds}` : 'Quick Play · Starting'
+      : st === 'MATCH_FINISHED' ? 'Finished' : (t ? `Round ${t.round}/${room.config.rounds}` : 'Starting');
   const hint = $('#hint');
   if (st === 'DRAWING' && t && t.phase === 'drawing') hint.textContent = (t.word ? t.word : (t.hint || []).join(' '));
   else if (st === 'DRAWING') hint.textContent = '';
@@ -183,6 +193,20 @@ function renderRoom() {
   $('#chatin').placeholder = guessing ? 'Type your guess' : 'Chat with your room';
   renderOverlay();
 }
+$('#quick-play').addEventListener('click', () => send({ type: 'quick_play' }));
+$('#fullscreen').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  } catch (error) {
+    toast(error instanceof Error ? error.message : 'Full screen is not available in this browser.', true);
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  const active = Boolean(document.fullscreenElement);
+  $('#fullscreen').textContent = active ? 'Exit full screen' : 'Full screen';
+  $('#fullscreen').setAttribute('aria-label', active ? 'Exit full screen' : 'Enter full screen');
+});
 function renderOverlay() {
   const ov = $('#overlay'), st = room.state, t = room.turn, isHost = room.hostId === room.you;
   ov.replaceChildren();
@@ -190,11 +214,17 @@ function renderOverlay() {
   let show = true;
   if (st === 'WAITING') {
     const connected = room.players.filter(p => p.connected && !p.left).length;
-    ov.append(h('h2', { text: 'Waiting for players' }), h('div', { class: 'code', text: room.code }),
-      h('button', { class: 'btn small', onclick: () => copy(room.code) }, 'Copy code'),
-      h('button', { class: 'btn small', onclick: () => copy(location.origin + '/?room=' + room.code) }, 'Copy invite link'),
-      h('div', { text: `${connected} of ${limits.maxPlayers} players` }));
-    if (isHost) {
+    if (room.publicMatch) {
+      ov.append(h('h2', { text: 'Waiting for random players' }),
+        h('div', { text: `${connected} player${connected === 1 ? '' : 's'} here · ${room.minPlayers} needed to start` }),
+        h('div', { class: 'small', text: 'This public game is open. Other players can join with Quick Play—no code or invite is needed.' }));
+    } else {
+      ov.append(h('h2', { text: 'Waiting for players' }), h('div', { class: 'code', text: room.code }),
+        h('button', { class: 'btn small', onclick: () => copy(room.code) }, 'Copy code'),
+        h('button', { class: 'btn small', onclick: () => copy(location.origin + '/?room=' + room.code) }, 'Copy invite link'),
+        h('div', { text: `${connected} of ${limits.maxPlayers} players` }));
+    }
+    if (!room.publicMatch && isHost) {
       const r = h('select', { 'aria-label': 'Rounds', onchange: () => send({ type: 'update_config', config: { rounds: +r.value } }) });
       for (let i = limits.rounds.min; i <= limits.rounds.max; i++) r.append(h('option', { value: i, text: i + ' round' + (i > 1 ? 's' : '') }));
       r.value = room.config.rounds;
@@ -204,8 +234,8 @@ function renderOverlay() {
       ov.append(h('div', {}, r, ' ', d),
         h('button', { class: 'btn primary', disabled: connected < room.minPlayers, onclick: () => send({ type: 'start_match' }) }, 'Start match'),
         connected < room.minPlayers ? h('div', { class: 'small', text: `Need at least ${room.minPlayers} players.` }) : null);
-    } else ov.append(h('div', { text: `${room.config.rounds} rounds, ${room.config.drawTime}s each. Waiting for the host to start.` }));
-    ov.append(h('button', { class: 'btn small', onclick: leave }, 'Leave room'),
+    } else if (!room.publicMatch) ov.append(h('div', { text: `${room.config.rounds} rounds, ${room.config.drawTime}s each. Waiting for the host to start.` }));
+    ov.append(h('button', { class: 'btn small', onclick: leave }, room.publicMatch ? 'Leave Quick Play' : 'Leave room'),
       h('div', { class: 'small', text: `Coins are awarded only when ${room.rewardMinPlayers}+ players finish the match.` }));
   } else if (st === 'STARTING') {
     ov.append(h('h2', { text: 'Get ready…' }));
@@ -230,7 +260,10 @@ function renderOverlay() {
       else if (mine && !mine.eligible) ov.append(h('div', { class: 'small', text: 'You were away too long to qualify for Coins.' }));
       if (profile) ov.append(h('div', { text: `Balance: ${profile.coins} Coins` }));
     }
-    ov.append(h('div', {}, isHost ? h('button', { class: 'btn primary', onclick: () => send({ type: 'rematch' }) }, 'Play again') : h('span', { class: 'small', text: 'Waiting for the host to start a rematch.' }), ' ', h('button', { class: 'btn small', onclick: leave }, 'Leave room')));
+    ov.append(h('div', {}, room.publicMatch
+      ? h('button', { class: 'btn primary', onclick: () => { leave(); send({ type: 'quick_play' }); } }, 'Find another public game')
+      : isHost ? h('button', { class: 'btn primary', onclick: () => send({ type: 'rematch' }) }, 'Play again') : h('span', { class: 'small', text: 'Waiting for the host to start a rematch.' }),
+    ' ', h('button', { class: 'btn small', onclick: leave }, 'Leave room')));
   } else show = false;
   ov.hidden = !show;
 }
@@ -319,270 +352,7 @@ function endStroke() {
 cv.addEventListener('pointerup', endStroke);
 cv.addEventListener('pointercancel', endStroke);
 
-/* ───────── solo AI practice ───────── */
-const practiceCanvas = $('#practice-canvas'), practiceContext = practiceCanvas.getContext('2d');
-const practice = { words: [], used: new Set(), rounds: 0, seconds: 60, turn: 0, correct: 0, total: 0, word: '', choices: [], color: 0, size: 2, eraser: false, drawing: false, points: [], deadline: 0, timerInterval: null, submitting: false };
-for (let rounds = 1; rounds <= 6; rounds++) $('#practice-rounds').append(h('option', { value: rounds, text: rounds + (rounds === 1 ? ' round' : ' rounds') }));
-for (const seconds of [30, 45, 60, 80, 100, 120]) $('#practice-time').append(h('option', { value: seconds, text: seconds + ' seconds' }));
-$('#practice-time').value = '60';
-
-function practiceClear() { practiceContext.clearRect(0, 0, practiceCanvas.width, practiceCanvas.height); }
-function stopPracticeTimer() {
-  if (practice.timerInterval) clearInterval(practice.timerInterval);
-  practice.timerInterval = null;
-  practice.deadline = 0;
-  $('#practice-timer').textContent = '–';
-}
-function startPracticeTimer() {
-  stopPracticeTimer();
-  practice.deadline = Date.now() + practice.seconds * 1000;
-  const tick = () => {
-    const remaining = Math.max(0, Math.ceil((practice.deadline - Date.now()) / 1000));
-    $('#practice-timer').textContent = remaining + 's';
-    if (!remaining) {
-      stopPracticeTimer();
-      if (practice.turn % 2 === 0) {
-        $$('#practice-choices button').forEach(button => { button.disabled = true; });
-        finishPracticeTurn(false, `Time is up — the drawing was ${practice.word}.`);
-      } else submitPracticeDrawing(true);
-    }
-  };
-  tick();
-  practice.timerInterval = setInterval(tick, 250);
-}
-function setPracticeMessage(message, error = false) {
-  const target = $('#practice-error');
-  target.textContent = message;
-  target.classList.toggle('bad', error);
-}
-async function practiceRequest(path, body) {
-  let response;
-  try {
-    response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { cache: 'no-store' });
-  } catch (_) {
-    throw new Error('Could not connect to the practice service. Please check your connection.');
-  }
-  let data;
-  try { data = await response.json(); } catch (_) { throw new Error('The practice service returned an unreadable response.'); }
-  if (!response.ok) throw new Error(data.error || 'AI practice is temporarily unavailable.');
-  return data;
-}
-function choosePracticeWords(count) {
-  if (practice.words.length - practice.used.size < count) throw new Error('Not enough unused practice words for this session.');
-  const available = practice.words.filter(word => !practice.used.has(word));
-  const selected = [];
-  for (let i = 0; i < count; i++) {
-    const index = Math.floor(Math.random() * available.length);
-    const [word] = available.splice(index, 1);
-    practice.used.add(word); selected.push(word);
-  }
-  return selected;
-}
-function practiceDrawStroke(stroke) { drawStrokeOn(practiceContext, practiceCanvas, stroke); }
-function showPracticeResult(message, correct) {
-  const output = $('#practice-result');
-  output.textContent = message;
-  output.classList.toggle('good', correct);
-  output.classList.toggle('bad', !correct);
-}
-function normalizePracticeGuess(value) {
-  return value.trim().toLocaleLowerCase('en-US').replace(/^(a|an|the)\s+/, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
-}
-function renderPracticeChoices(choices, callback) {
-  const container = $('#practice-choices');
-  container.replaceChildren(...choices.map(word => h('button', {
-    class: 'btn', type: 'button', onclick: () => {
-      $$('#practice-choices button').forEach(button => { button.disabled = true; });
-      callback(word);
-    }
-  }, word)));
-}
-function updatePracticeProgress() {
-  const round = Math.min(Math.floor(practice.turn / 2) + 1, practice.rounds);
-  $('#practice-round-label').textContent = `Round ${round} of ${practice.rounds}`;
-  $('#practice-score').textContent = `${practice.correct} correct`;
-}
-function finishPracticeTurn(correct, message) {
-  stopPracticeTimer();
-  practice.total++;
-  if (correct) practice.correct++;
-  $('#practice-status').textContent = 'Turn complete';
-  $('#practice-guess-form').hidden = true;
-  showPracticeResult(message, correct);
-  $('#practice-next').hidden = false;
-  $('#practice-next').textContent = practice.turn + 1 >= practice.rounds * 2 ? 'Finish practice' : 'Continue';
-  updatePracticeProgress();
-}
-async function beginPracticeTurn() {
-  stopPracticeTimer();
-  practice.submitting = false;
-  $('#practice-next').hidden = true;
-  $('#practice-result').textContent = '';
-  $('#practice-result').classList.remove('good', 'bad');
-  $('#practice-choices').replaceChildren();
-  $('#practice-guess-form').hidden = true;
-  $('#practice-guess').value = '';
-  $('#practice-tools').hidden = true;
-  $('#practice-submit').disabled = false;
-  practiceClear();
-  updatePracticeProgress();
-  if (practice.turn >= practice.rounds * 2) {
-    $('#practice-status').textContent = 'Practice complete';
-    $('#practice-prompt').textContent = `You got ${practice.correct} of ${practice.total} turns correct.`;
-    $('#practice-next').textContent = 'Start another practice';
-    $('#practice-next').hidden = false;
-    return;
-  }
-  if (practice.turn % 2 === 0) {
-    practice.choices = choosePracticeWords(3);
-    $('#practice-status').textContent = 'AI is drawing…';
-    $('#practice-prompt').textContent = 'Guess what the AI is drawing:';
-    try {
-      const result = await practiceRequest('/api/ai/draw', { choices: practice.choices });
-      practice.word = result.word;
-      result.strokes.forEach(practiceDrawStroke);
-      $('#practice-status').textContent = 'Type your guess';
-      $('#practice-guess-form').hidden = false;
-      $('#practice-guess').focus();
-      startPracticeTimer();
-    } catch (error) {
-      $('#practice-status').textContent = 'AI turn unavailable';
-      showPracticeResult(error.message, false);
-      $('#practice-next').textContent = 'Try this turn again';
-      $('#practice-next').hidden = false;
-      practice.turn--;
-    }
-    return;
-  }
-  practice.choices = choosePracticeWords(3);
-  $('#practice-status').textContent = 'Your turn to draw';
-  $('#practice-prompt').textContent = 'Choose one word to draw. The AI will guess without choices.';
-  renderPracticeChoices(practice.choices, word => {
-    practice.word = word;
-    $('#practice-choices').replaceChildren();
-    $('#practice-prompt').textContent = `Draw: ${word}`;
-    $('#practice-status').textContent = 'Draw, then ask AI to guess';
-    $('#practice-tools').hidden = false;
-    startPracticeTimer();
-  });
-}
-$('#practice-start').addEventListener('click', async () => {
-  const button = $('#practice-start');
-  button.disabled = true;
-  setPracticeMessage('');
-  try {
-    const status = await practiceRequest('/api/ai/status');
-    if (!status.available) throw new Error(status.message || 'Local AI is unavailable. Start Ollama and install its vision model. Multiplayer remains available.');
-    const bank = await practiceRequest('/api/words');
-    if (!Array.isArray(bank.words) || bank.words.length < 1000) throw new Error('The practice word bank is unavailable.');
-    practice.words = bank.words;
-    practice.used = new Set();
-    practice.rounds = Number($('#practice-rounds').value);
-    practice.seconds = Number($('#practice-time').value);
-    practice.turn = 0;
-    practice.correct = 0;
-    practice.total = 0;
-    $('#practice-setup').hidden = true;
-    $('#practice-game').hidden = false;
-    await beginPracticeTurn();
-  } catch (error) {
-    setPracticeMessage(error.message, true);
-  } finally {
-    button.disabled = false;
-  }
-});
-$('#practice-guess-form').addEventListener('submit', event => {
-  event.preventDefault();
-  const guess = $('#practice-guess').value;
-  if (!guess.trim()) {
-    $('#practice-guess').focus();
-    return;
-  }
-  const correct = normalizePracticeGuess(guess) === normalizePracticeGuess(practice.word);
-  finishPracticeTurn(correct, correct
-    ? `Correct — it was ${practice.word}!`
-    : `Not quite — your guess was "${guess.trim()}". The drawing was ${practice.word}.`);
-});
-$('#practice-next').addEventListener('click', async () => {
-  if (practice.turn + 1 >= practice.rounds * 2 && $('#practice-status').textContent === 'Practice complete') {
-    $('#practice-game').hidden = true;
-    $('#practice-setup').hidden = false;
-    return;
-  }
-  practice.turn++;
-  await beginPracticeTurn();
-});
-async function submitPracticeDrawing(timedOut = false) {
-  if (practice.submitting) return;
-  practice.submitting = true;
-  stopPracticeTimer();
-  const button = $('#practice-submit');
-  button.disabled = true;
-  $('#practice-status').textContent = timedOut ? 'Time is up — AI is guessing…' : 'AI is guessing…';
-  try {
-    const result = await practiceRequest('/api/ai/guess', { image: practiceCanvas.toDataURL('image/png') });
-    const correct = normalizePracticeGuess(result.word) === normalizePracticeGuess(practice.word);
-    finishPracticeTurn(correct,
-      correct ? `AI guessed correctly: ${result.word}.` : `AI guessed "${result.word}"; your word was ${practice.word}.`);
-  } catch (error) {
-    button.disabled = false;
-    practice.submitting = false;
-    if (timedOut) finishPracticeTurn(false, `Time is up. AI could not guess: ${error.message} Your word was ${practice.word}.`);
-    else {
-      $('#practice-status').textContent = 'AI guess unavailable';
-      showPracticeResult(error.message, false);
-    }
-  }
-}
-$('#practice-submit').addEventListener('click', () => submitPracticeDrawing());
-$('#practice-clear').addEventListener('click', practiceClear);
-function syncPracticeTools() {
-  $$('#practice-swatches .sw').forEach((button, index) => button.setAttribute('aria-checked', String(index === practice.color && !practice.eraser)));
-  $$('#practice-sizes .sz').forEach((button, index) => button.setAttribute('aria-checked', String(index === practice.size)));
-  $('#practice-eraser').setAttribute('aria-pressed', String(practice.eraser));
-}
-PALETTE.forEach((paint, index) => {
-  const button = h('button', {
-    class: 'sw', type: 'button', role: 'radio', 'aria-label': 'Colour ' + (index + 1), 'aria-checked': index === practice.color,
-    onclick: () => { practice.color = index; practice.eraser = false; syncPracticeTools(); }
-  });
-  button.style.background = paint;
-  $('#practice-swatches').append(button);
-});
-SIZES.forEach((width, index) => {
-  const dot = h('i');
-  dot.style.width = dot.style.height = Math.min(22, 4 + width * 0.6) + 'px';
-  $('#practice-sizes').append(h('button', {
-    class: 'sz', type: 'button', role: 'radio', 'aria-label': 'Brush size ' + (index + 1), 'aria-checked': index === practice.size,
-    onclick: () => { practice.size = index; syncPracticeTools(); }
-  }, dot));
-});
-$('#practice-eraser').addEventListener('click', () => { practice.eraser = !practice.eraser; syncPracticeTools(); });
-function practicePoint(event) {
-  const rect = practiceCanvas.getBoundingClientRect();
-  return [Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)), Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height))];
-}
-practiceCanvas.addEventListener('pointerdown', event => {
-  if ($('#practice-tools').hidden || $('#practice-submit').disabled) return;
-  practiceCanvas.setPointerCapture(event.pointerId);
-  practice.drawing = true;
-  const point = practicePoint(event);
-  practice.points = [point];
-  practiceDrawStroke({ pts: [point], c: practice.color, s: practice.size, e: practice.eraser });
-  event.preventDefault();
-});
-practiceCanvas.addEventListener('pointermove', event => {
-  if (!practice.drawing) return;
-  const point = practicePoint(event);
-  const previous = practice.points[practice.points.length - 1];
-  practiceDrawStroke({ pts: [previous, point], c: practice.color, s: practice.size, e: practice.eraser });
-  practice.points.push(point);
-});
-function endPracticeStroke() { practice.drawing = false; }
-practiceCanvas.addEventListener('pointerup', endPracticeStroke);
-practiceCanvas.addEventListener('pointercancel', endPracticeStroke);
-
-/* ───────── leaderboard ───────── */
+/* leaderboard */
 $('#boardtabs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   boardView = b.dataset.b; boardPage = 1;

@@ -39,6 +39,6 @@ const groups = [
 const normalized = groups.flatMap(group => group.split(/\s+/).filter(Boolean).map(word => word.replace(/_/g, ' ')));
 const unique = [...new Set(normalized.map(word => word.toLocaleLowerCase('en-US')))];
 
-if (unique.length < 1000) throw new Error(`Practice word bank needs at least 1,000 unique entries; found ${unique.length}.`);
+if (unique.length < 1000) throw new Error(`Game word list needs at least 1,000 unique entries; found ${unique.length}.`);
 
 module.exports = unique.slice(0, 1000);

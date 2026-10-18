@@ -79,117 +79,54 @@ const ledger = () => _test.db.ledger;
     assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'self' http:\/\/localhost:3037/);
   });
 
-  await test('practice has 1,000 unique words and reports when local Ollama is unavailable', async () => {
-    const previousFetch = global.fetch;
-    global.fetch = async () => { throw new Error('Ollama is not running'); };
-    try {
-      const [wordResponse, statusResponse] = await Promise.all([
-        nativeFetch(`http://localhost:${port}/api/words`),
-        nativeFetch(`http://localhost:${port}/api/ai/status`)
-      ]);
-      const bank = await wordResponse.json(), status = await statusResponse.json();
-      assert.strictEqual(wordResponse.status, 200);
-      assert.strictEqual(bank.words.length, 1000);
-      assert.strictEqual(new Set(bank.words).size, 1000);
-      assert.strictEqual(status.available, false);
-      assert.match(status.message, /Ollama/i);
-      const response = await nativeFetch(`http://localhost:${port}/api/ai/draw`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choices: bank.words.slice(0, 3) })
-      });
-      assert.strictEqual(response.status, 503);
-      assert.match((await response.json()).error, /Ollama/i);
-    } finally {
-      global.fetch = previousFetch;
+  await test('AI practice endpoints and navigation are removed', async () => {
+    for (const endpoint of ['/api/words', '/api/ai/status', '/api/ai/draw', '/api/ai/guess']) {
+      const response = await nativeFetch('http://localhost:' + port + endpoint);
+      assert.strictEqual(response.status, 404);
     }
+    const response = await nativeFetch('http://localhost:' + port + '/');
+    const page = await response.text();
+    assert.doesNotMatch(page, /Practice vs AI|practice-canvas|practice-start/i);
   });
-
-  await test('practice AI endpoints reject invalid drawing choices and image data', async () => {
-    const badWords = await fetch(`http://localhost:${port}/api/ai/draw`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ choices: ['not-a-word', 'bad', 'input'] })
-    });
-    assert.strictEqual(badWords.status, 400);
-    const badImage = await fetch(`http://localhost:${port}/api/ai/guess`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: 'data:image/svg+xml;base64,PHN2Zz4=' })
-    });
-    assert.strictEqual(badImage.status, 400);
-  });
-
-  await test('Ollama draws from choices but guesses drawings without options', async () => {
-    const previousFetch = global.fetch;
-    const previousBaseUrl = process.env.OLLAMA_BASE_URL;
-    const previousModel = process.env.OLLAMA_VISION_MODEL;
-    process.env.OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
-    process.env.OLLAMA_VISION_MODEL = 'qwen2.5vl:3b';
-    let calls = 0;
-    let guessMessage;
-    global.fetch = async (url, options = {}) => {
-      const endpoint = new URL(url).pathname;
-      if (endpoint === '/api/tags') return new Response(JSON.stringify({ models: [{ name: 'qwen2.5vl:3b' }] }), {
-        status: 200, headers: { 'Content-Type': 'application/json' }
-      });
-      assert.strictEqual(endpoint, '/api/chat');
-      const requested = JSON.parse(options.body);
-      assert.strictEqual(requested.model, 'qwen2.5vl:3b');
-      assert.strictEqual(requested.format, 'json');
-      assert.strictEqual(requested.stream, false);
-      calls++;
-      if (calls === 1) {
-        const choices = JSON.parse(requested.messages[1].content.match(/\[[^\]]+\]/)[0]);
-        const content = { word: choices[1], strokes: [{ c: 0, s: 2, e: false, pts: [[0.2, 0.3], [0.4, 0.5]] }] };
-        return new Response(JSON.stringify({ message: { content: JSON.stringify(content) } }), {
-          status: 200, headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      guessMessage = requested.messages[1];
-      return new Response(JSON.stringify({ message: { content: JSON.stringify({ word: 'fire fighter' }) } }), {
-        status: 200, headers: { 'Content-Type': 'application/json' }
-      });
-    };
-    try {
-      const words = require('../words');
-      const statusResponse = await nativeFetch(`http://localhost:${port}/api/ai/status`);
-      const status = await statusResponse.json();
-      assert.strictEqual(status.available, true);
-      assert.strictEqual(status.model, 'qwen2.5vl:3b');
-      const drawResponse = await nativeFetch(`http://localhost:${port}/api/ai/draw`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ choices: words.slice(0, 3) })
-      });
-      const drawing = await drawResponse.json();
-      assert.strictEqual(drawResponse.status, 200);
-      assert.strictEqual(drawing.word, words[1]);
-      assert.strictEqual(drawing.strokes.length, 1);
-      const png = Buffer.alloc(24);
-      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(png, 0);
-      png.write('IHDR', 12, 'ascii'); png.writeUInt32BE(800, 16); png.writeUInt32BE(500, 20);
-      const guessResponse = await nativeFetch(`http://localhost:${port}/api/ai/guess`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: 'data:image/png;base64,' + png.toString('base64') })
-      });
-      const guess = await guessResponse.json();
-      assert.strictEqual(guessResponse.status, 200);
-      assert.strictEqual(guess.word, 'fire fighter');
-      assert.strictEqual(guessMessage.images.length, 1);
-      assert.strictEqual(guessMessage.images[0], png.toString('base64'));
-      assert.strictEqual(guessMessage.content.includes(JSON.stringify(words.slice(3, 6))), false);
-      assert.strictEqual(calls, 2);
-    } finally {
-      global.fetch = previousFetch;
-      if (previousBaseUrl === undefined) delete process.env.OLLAMA_BASE_URL;
-      else process.env.OLLAMA_BASE_URL = previousBaseUrl;
-      if (previousModel === undefined) delete process.env.OLLAMA_VISION_MODEL;
-      else process.env.OLLAMA_VISION_MODEL = previousModel;
-    }
-  });
-
   await test('requests before hello are rejected', async () => {
     const b = await new Bot('x').connect(false);
     b.send({ type: 'create_room', config: {} });
     await b.waitFor(() => b.errors.length);
-    assert.strictEqual(b.errors[0].code, 'unauth'); b.close();
+    assert.strictEqual(b.errors[0].code, 'unauth');
+    b.close();
+  });
+
+  await test('Quick Play enters a public lobby immediately and starts when another player joins', async () => {
+    const first = await new Bot('Quick One').connect();
+    const second = await new Bot('Quick Two').connect();
+    try {
+      first.send({ type: 'quick_play' });
+      const soloLobby = await first.waitFor(() => first.state && first.state.publicMatch && first.state.state === 'WAITING' && first.state);
+      assert.strictEqual(soloLobby.players.length, 1);
+      assert.strictEqual(_test.publicRoom.code, soloLobby.code);
+      first.send({ type: 'leave_room' });
+      await first.waitFor(() => first.msgs.find(m => m.type === 'left'));
+      assert.strictEqual(_test.publicRoom, null);
+
+      first.send({ type: 'quick_play' });
+      const waitingRoom = await first.waitFor(() => first.state && first.state.publicMatch
+        && first.state.code !== soloLobby.code && first.state.state === 'WAITING' && first.state);
+      second.send({ type: 'quick_play' });
+      const firstState = await first.waitFor(() => first.state && first.state.publicMatch && first.state.code === waitingRoom.code && first.state.state === 'STARTING' && first.state);
+      const secondState = await second.waitFor(() => second.state && second.state.publicMatch && second.state.code === waitingRoom.code && second.state.state === 'STARTING' && second.state);
+      assert.strictEqual(firstState.code, secondState.code);
+      assert.strictEqual(firstState.players.length, 2);
+      assert.notStrictEqual(firstState.you, secondState.you);
+      first.send({ type: 'leave_room' });
+      second.send({ type: 'leave_room' });
+      await Promise.all([
+        first.waitFor(() => first.msgs.find(m => m.type === 'left')),
+        second.waitFor(() => second.msgs.find(m => m.type === 'left'))
+      ]);
+    } finally {
+      first.close();
+      second.close();
+    }
   });
 
   let game4, rows4, room4;
