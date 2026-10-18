@@ -989,6 +989,49 @@ function start(port = C.PORT) {
       'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' ws: wss:; img-src 'self'; frame-ancestors ${frameAncestors}`
     };
     if (url === '/healthz') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
+    if (url === '/api/guest-session') {
+      if (req.method !== 'POST') { res.writeHead(405, { Allow: 'POST' }); return res.end(); }
+      const origin = req.headers.origin;
+      if (origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`) {
+        res.writeHead(403, { 'Content-Type': 'application/json', ...headers });
+        return res.end(JSON.stringify({ error: 'Invalid request origin.' }));
+      }
+      let body = '';
+      let tooLarge = false;
+      req.on('data', chunk => {
+        if (tooLarge) return;
+        body += chunk;
+        if (body.length > 1024) {
+          tooLarge = true;
+          res.writeHead(413, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers });
+          res.end(JSON.stringify({ error: 'Guest session request is too large.' }));
+        }
+      });
+      req.on('end', () => {
+        if (tooLarge) return;
+        let guestId;
+        try {
+          const parsed = JSON.parse(body);
+          guestId = parsed && parsed.guestId;
+        } catch (_) {
+          res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers });
+          return res.end(JSON.stringify({ error: 'Invalid guest session request.' }));
+        }
+        if (typeof guestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(guestId)) {
+          res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers });
+          return res.end(JSON.stringify({ error: 'Invalid guest session request.' }));
+        }
+        const payload = Buffer.from(JSON.stringify({
+          sub: `guest:${guestId.toLowerCase()}`,
+          guest: true,
+          exp: Math.floor(now() / 1000) + 5 * 60
+        })).toString('base64url');
+        const signature = crypto.createHmac('sha256', authSecret).update(payload).digest('base64url');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers });
+        res.end(JSON.stringify({ ticket: `${payload}.${signature}` }));
+      });
+      return;
+    }
     const f = FILES[url];
     if (!f) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found'); }
     fs.readFile(path.join(PUBLIC, f), (e, buf) => {

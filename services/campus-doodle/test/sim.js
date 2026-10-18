@@ -80,6 +80,36 @@ const ledger = () => _test.db.ledger;
     assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'self' http:\/\/localhost:3037/);
   });
 
+  await test('standalone game issues a signed guest ticket for room-code invites', async () => {
+    const guestId = crypto.randomUUID();
+    const response = await nativeFetch(`http://localhost:${port}/api/guest-session`, {
+      method: 'POST',
+      headers: { Origin: `http://localhost:${port}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId })
+    });
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get('cache-control'), 'no-store');
+    const { ticket } = await response.json();
+    const payload = JSON.parse(Buffer.from(ticket.split('.')[0], 'base64url').toString('utf8'));
+    assert.strictEqual(payload.sub, 'guest:' + guestId);
+    assert.strictEqual(payload.guest, true);
+    assert.ok(payload.exp > Math.floor(Date.now() / 1000));
+    const rejected = await nativeFetch(`http://localhost:${port}/api/guest-session`, {
+      method: 'POST',
+      headers: { Origin: 'https://example.com', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId: crypto.randomUUID() })
+    });
+    assert.strictEqual(rejected.status, 403);
+    const guest = await new Bot('Invite Guest').connect(false);
+    try {
+      guest.send({ type: 'hello', ticket, name: guest.name });
+      await guest.waitFor(() => guest.profile);
+      assert.strictEqual(guest.profile.guest, true);
+    } finally {
+      guest.close();
+    }
+  });
+
   await test('AI practice endpoints and navigation are removed', async () => {
     for (const endpoint of ['/api/words', '/api/ai/status', '/api/ai/draw', '/api/ai/guess']) {
       const response = await nativeFetch('http://localhost:' + port + endpoint);

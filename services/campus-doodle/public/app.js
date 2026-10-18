@@ -28,7 +28,29 @@ function requestTicket() {
   if (window.parent !== window && parentOrigin) {
     window.parent.postMessage({ type: 'campus-doodle-auth-request' }, parentOrigin);
   } else if (window.parent === window) {
-    $('#banner').textContent = 'Open Campus Doodle from your logged-in CampusVoice account to play.';
+    void requestGuestTicket();
+  }
+}
+async function requestGuestTicket() {
+  try {
+    let guestId = sessionStorage.getItem('campus-doodle-guest-id');
+    if (!guestId) {
+      guestId = crypto.randomUUID();
+      sessionStorage.setItem('campus-doodle-guest-id', guestId);
+    }
+    const response = await fetch('/api/guest-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId }),
+      cache: 'no-store'
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not start a guest game session.');
+    ticket = data.ticket;
+    $('#banner').hidden = true;
+    if (ws && ws.readyState === 1) send({ type: 'hello', ticket, name: myName || undefined });
+  } catch (error) {
+    $('#banner').textContent = error instanceof Error ? error.message : 'Could not start a guest game session.';
     $('#banner').hidden = false;
   }
 }
