@@ -393,7 +393,7 @@ function rankPlayers(room) {
   const pool = [...room.players.values()].filter(p => m.participants.has(p.id) && !p.left);
   pool.sort((a, b) => b.score - a.score || b.correct - a.correct || a.order - b.order); // deterministic, no shared ranks
   const needed = Math.ceil(m.turnsCompleted * C.REWARD_MIN_TURN_SHARE);
-  return pool.map((p, i) => ({ id: p.id, name: p.name, rank: i + 1, score: p.score, correct: p.correct, fast: p.fast, eligible: p.turnsPresent >= needed && m.turnsCompleted > 0 }));
+  return pool.map((p, i) => ({ id: p.id, name: p.name, rank: i + 1, score: p.score, correct: p.correct, fast: p.fast, eligible: !p.guest && p.turnsPresent >= needed && m.turnsCompleted > 0 }));
 }
 function assess(room, ranked, forceInvalid) {
   const m = room.match, signals = [], withheld = new Set();
@@ -603,6 +603,11 @@ function sweep() {
 
 /* ────────────────────────────── client actions ────────────────────────────── */
 function roomOf(ctx) { const c = playerRoom.get(ctx.id); return c ? rooms.get(c) : null; }
+function sessionProfile(ctx) {
+  const profile = db.players[ctx.id] || ensureProfile(ctx.id, ctx.name, !ctx.isGuest);
+  if (ctx.isGuest) profile.guest = true;
+  return profile;
+}
 
 function schedulePublicStart(room) {
   if (publicStartTimers.has(room) || room.state !== 'WAITING'
@@ -628,7 +633,7 @@ function createPublicRoom(ctx) {
   };
   rooms.set(room.code, room);
   publicRooms.add(room);
-  addPlayer(room, ctx.id, db.players[ctx.id].name);
+  addPlayer(room, ctx.id, sessionProfile(ctx).name);
   publicRoom = room;
   send(ctx.ws, { type: 'chatlog', msgs: [] });
   broadcastState(room);
@@ -646,7 +651,7 @@ function onQuickPlay(ctx) {
   }
   publicRoom = room;
   const activePublicMatch = room.state !== 'WAITING';
-  const p = addPlayer(room, ctx.id, db.players[ctx.id].name);
+  const p = addPlayer(room, ctx.id, sessionProfile(ctx).name);
   if (activePublicMatch) {
     room.match.order.push(p.id);
     room.match.participants.add(p.id);
@@ -708,6 +713,7 @@ async function onHello(ctx, msg) {
   const prof = ensureProfile(id, name, !identity.guest);
   prof.guest = identity.guest;
   prof.coins = balance;
+  ctx.name = prof.name;
   if (!identity.guest) {
     try { saveDb(); } catch (e) { console.error('Could not update local Campus Doodle cache:', e.message); }
   }
@@ -733,7 +739,7 @@ function onCreate(ctx, msg) {
   log.push(now()); createLog.set(ctx.id, log);
   const room = { code: genCode(), hostId: ctx.id, state: 'WAITING', deadline: 0, config: cleanConfig(msg.config), players: new Map(), match: null, turn: null, next: null, result: null, chat: [], createdAt: now(), emptySince: null, lowSince: null, finalizeRetry: null };
   rooms.set(room.code, room);
-  addPlayer(room, ctx.id, db.players[ctx.id].name);
+  addPlayer(room, ctx.id, sessionProfile(ctx).name);
   send(ctx.ws, { type: 'chatlog', msgs: [] });
   sys(room, 'Room created. Share the code to invite friends.');
   broadcastState(room);
@@ -746,7 +752,7 @@ function onJoin(ctx, msg) {
   if (!room) return err(ctx, 'No room with that code.', 'no_room');
   if (room.state !== 'WAITING') return err(ctx, 'That match has already started.', 'started');
   if (room.players.size >= C.MAX_PLAYERS) return err(ctx, 'That room is full.', 'full');
-  const p = addPlayer(room, ctx.id, db.players[ctx.id].name);
+  const p = addPlayer(room, ctx.id, sessionProfile(ctx).name);
   send(ctx.ws, { type: 'chatlog', msgs: room.chat });
   sys(room, `${p.name} joined.`);
   broadcastState(room);
@@ -1049,8 +1055,8 @@ async function route(ctx, msg) {
     ctx.ws.close(4001, 'CampusVoice login expired');
     return;
   }
-  if (ctx.isGuest && !['quick_play', 'leave_room', 'draw', 'guess', 'choose_word'].includes(msg.type)) {
-    return err(ctx, 'Guest access is limited to Quick Play. Log in to use private rooms, Coins, and saved game features.', 'guest_restricted');
+  if (ctx.isGuest && !['quick_play', 'create_room', 'join_room', 'leave_room', 'update_config', 'start_match', 'rematch', 'draw', 'guess', 'choose_word'].includes(msg.type)) {
+    return err(ctx, 'Guests can play Quick Play or private rooms with a code. Log in to CampusVoice to earn or use Coins and access saved game features.', 'guest_restricted');
   }
   if (msg.type === 'draw') { if (!take(ctx.draw)) { ctx.violations++; return; } return onDraw(ctx, msg); }
   if (!take(ctx.general)) { ctx.violations++; return; }

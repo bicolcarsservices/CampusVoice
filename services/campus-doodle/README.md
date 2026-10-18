@@ -1,6 +1,6 @@
 # Campus Doodle
 
-Standalone real-time multiplayer drawing & guessing game. Guests can play Quick Play without signing in; CampusVoice login is required for private rooms and account-linked Coins.
+Standalone real-time multiplayer drawing & guessing game. Guests can play Quick Play and private rooms with a shared code without signing in; CampusVoice login is required for account-linked Coins and saved game features.
 Node.js server (WebSocket) + plain HTML/CSS/JS client. Account-linked Coin balances are stored in Supabase; player cosmetics, match history, and the leaderboard are stored in `data/db.json`.
 
 ## Run locally from CampusVoice
@@ -11,7 +11,7 @@ npm run game:doodle:test  # end-to-end tests (real server, real WebSocket bots)
 ```
 Keep CampusVoice running in another terminal. The `/games/campus-doodle` page embeds this service. Use **Quick Play** to enter a public waiting lobby immediately, even when no other players are online. Other players can join the same lobby using Quick Play, with no room code or invite; the match starts automatically once at least two players are present. Quick Play has endless rounds and no Coins payout; it returns to a public lobby when fewer than two players remain. To play privately, create a room and invite friends with its 5-letter code; private matches keep their configured round limit and normal reward rules. Use the **Full screen** button while playing for an immersive layout; the game rearranges its player list, canvas, and chat for landscape screens.
 
-Guests can join endless Quick Play from CampusVoice without signing in. Guest identities are limited to public Quick Play and do not receive persistent Coins, leaderboard, shop, inventory, or history access. Run `supabase/campus-doodle.sql` in the Supabase SQL Editor to create the account-linked Coin wallet. Set `CAMPUS_DOODLE_AUTH_SECRET` in the root `.env.local`; `game:doodle` reads the shared secret and optional Supabase server credentials from that file. Coins earned in eligible private matches and spent in the shop are stored in Supabase by CampusVoice user ID, so they persist across browsers and game-service restarts. Player names, cosmetics, match history, and leaderboard data remain in the game service's local data file.
+Guests can join endless Quick Play or private rooms with a shared code from CampusVoice without signing in. Guest identities do not receive Coins or access to the leaderboard, shop, inventory, or history. Guests in private matches do not count toward Coin eligibility and cannot receive a payout. Run `supabase/campus-doodle.sql` in the Supabase SQL Editor to create the account-linked Coin wallet. Set `CAMPUS_DOODLE_AUTH_SECRET` in the root `.env.local`; `game:doodle` reads the shared secret and optional Supabase server credentials from that file. Coins earned in eligible private matches and spent in the shop are stored in Supabase by CampusVoice user ID, so they persist across browsers and game-service restarts. Player names, cosmetics, match history, and leaderboard data remain in the game service's local data file.
 
 ## Deploy publicly (Vercel + Render)
 The Next.js CampusVoice app can run on Vercel, but the multiplayer game needs a separate Node service with WebSocket support. The repository-root `render.yaml` configures a free Render web service for the game.
@@ -31,7 +31,7 @@ The included Blueprint uses Render's free plan: the service may spin down when i
 - States: WAITING -> STARTING -> DRAWING -> ROUND_RESULTS -> NEXT_ROUND. Private matches end at their configured round limit; public Quick Play keeps cycling turns until players leave.
 - Guess points: 100-500 depending on time left; the artist earns 35% of each correct guesser's points.
 - Ranking: score, then correct guesses, then join order (no shared ranks). Rewards: 1st 100, 2nd 70, 3rd 50, 4th 25 Coins.
-- Private-match Coins need 3+ eligible players, a valid completed match, and presence for at least half the turns. Quick Play does not award Coins.
+- Private-match Coins need 3+ eligible signed-in players, a valid completed match, and presence for at least half the turns. Guests can participate in code rooms but do not earn Coins or count toward reward eligibility. Quick Play does not award Coins.
 - Reward safety: one all-or-nothing transaction, unique key `skribbl:<match>:<player>`, match recorded once. Repeats of the same group (4+/24h) are held for review (see `flags` in db.json), and each player is capped at 6 rewarded matches/hour.
 - Secret word is only sent to the artist (and to players after they guess it). Only the artist can draw. Rate limits and payload limits on everything.
 - Shop prices/ownership/balance are checked on the server; each purchase uses an idempotency key and a transaction (no double charge, no negative balance).

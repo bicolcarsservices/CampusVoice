@@ -67,7 +67,7 @@ async function makeRoom(names, rounds = 1) {
   for (const b of bots.slice(1)) { b.send({ type: 'join_room', code }); await b.waitFor(() => b.state); }
   return { bots, code };
 }
-const finished = bots => bots[0].waitFor(() => { const s = bots[0].state; return s && s.state === 'MATCH_FINISHED' && s.result && s; });
+const finished = (bots, ms = 20000) => bots[0].waitFor(() => { const s = bots[0].state; return s && s.state === 'MATCH_FINISHED' && s.result && s; }, ms);
 const ledger = () => _test.db.ledger;
 
 (async () => {
@@ -107,16 +107,12 @@ const ledger = () => _test.db.ledger;
     assert.strictEqual(b.errors[0].code, 'bad_ticket');
     b.close();
   });
-  await test('guest can use Quick Play only and cannot earn or spend Coins', async () => {
+  await test('guest Quick Play cannot earn or spend Coins', async () => {
     const guest = await new Bot('Guest Player', 0, true).connect();
     const matchesBefore = _test.db.matches.length, ledgerBefore = ledger().length;
     try {
       assert.strictEqual(guest.profile.guest, true);
       assert.strictEqual(guest.profile.coins, 0);
-      guest.send({ type: 'create_room', config: { rounds: 1 } });
-      await guest.waitFor(() => guest.errors.length);
-      assert.strictEqual(guest.errors[0].code, 'guest_restricted');
-      guest.errors.length = 0;
       guest.send({ type: 'quick_play' });
       const lobby = await guest.waitFor(() => guest.state && guest.state.publicMatch && guest.state.state === 'WAITING' && guest.state);
       assert.strictEqual(lobby.players[0].guest, true);
@@ -133,6 +129,42 @@ const ledger = () => _test.db.ledger;
       assert.strictEqual(savedPlayers['guest:' + guest.userId], undefined, 'guest profiles are never persisted');
     } finally {
       guest.close();
+    }
+  });
+
+  await test('guest can join a code room and only signed-in players can earn Coins', async () => {
+    const guest = await new Bot('Guest Player', 0, true).connect();
+    const accounts = [await new Bot('Account One', 0).connect(), await new Bot('Account Two', 0).connect(), await new Bot('Account Three', 0).connect()];
+    const bots = [guest, ...accounts];
+    const game = {};
+    try {
+      accounts[0].send({ type: 'create_room', config: { rounds: 1, drawTime: 3 } });
+      const lobby = await accounts[0].waitFor(() => accounts[0].state && !accounts[0].state.publicMatch && accounts[0].state.state === 'WAITING' && accounts[0].state);
+      assert.match(lobby.code, /^[A-Z0-9]{5}$/);
+      guest.send({ type: 'join_room', code: lobby.code });
+      const joinedLobby = await guest.waitFor(() => guest.state && guest.state.code === lobby.code && guest.state.players.length === 2 && guest.state);
+      assert.ok(joinedLobby.players.some(player => player.guest), 'guest should join a private room with its shared code');
+      for (const account of accounts.slice(1)) {
+        account.send({ type: 'join_room', code: lobby.code });
+        await account.waitFor(() => account.state && account.state.code === lobby.code && account.state.players.length >= 2);
+      }
+      await guest.waitFor(() => guest.state && guest.state.players.length === 4);
+      autoplay(bots, game);
+      accounts[0].send({ type: 'start_match' });
+      const result = await finished(bots, 45000);
+      assert.strictEqual(result.result.valid, true, 'account players should still qualify for private-match Coins');
+      const guestRow = result.result.rows.find(row => row.id === 'guest:' + guest.userId);
+      assert.ok(guestRow);
+      assert.strictEqual(guestRow.eligible, false);
+      assert.strictEqual(guestRow.coins, 0);
+      assert.strictEqual(ledger().some(entry => entry.playerId === guestRow.id), false);
+      for (const account of accounts) {
+        const row = result.result.rows.find(entry => entry.id === account.userId);
+        assert.ok(row && row.eligible && row.coins > 0, 'signed-in account should earn its placement reward');
+        assert.strictEqual(_test.db.players[account.userId].coins, row.coins);
+      }
+    } finally {
+      for (const bot of bots) bot.close();
     }
   });
 
@@ -340,7 +372,7 @@ const ledger = () => _test.db.ledger;
     const lb = await b.waitFor(() => b.msgs.find(m => m.type === 'leaderboard'));
     assert.strictEqual(lb.rows[0].coins, 100); assert.strictEqual(lb.rows[0].rank, 1);
     assert.ok(lb.rows.every(r => !('id' in r) && !('token' in r)));
-    assert.strictEqual(lb.rows.length, 8);                              // two valid 4-player matches; the 2-player (friendly) match is excluded
+    assert.strictEqual(lb.rows.length, 11);                             // two valid 4-player matches plus three signed-in players from a guest-hosted match
     b.send({ type: 'history' });
     const hs = await b.waitFor(() => b.msgs.find(m => m.type === 'history'));
     assert.ok(hs.matches.length >= 1);

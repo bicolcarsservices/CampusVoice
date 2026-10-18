@@ -43,8 +43,8 @@ export default async function CampusDoodlePage() {
       </header>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {user
-          ? "Draw clues and guess with friends in real time. Quick Play is endless and does not award Coins; log in to use private rooms and save your Coins."
-          : "Play Quick Play with random players without logging in. Guest games do not earn or save Coins; log in to create private rooms, use the shop, or keep your Coins."}
+          ? "Draw clues and guess with friends in real time. Play Quick Play or join private rooms with a code. CampusVoice accounts can earn and use Coins and access saved game features."
+          : "Play Quick Play with random players or join a private room with a shared code—no login needed. Only CampusVoice accounts can earn or use Coins and access saved game features."}
       </p>
       {!user && <Link href="/login?next=%2Fgames%2Fcampus-doodle" className="btn-primary inline-flex">Log in to CampusVoice</Link>}
       {gameUrl ? (
