@@ -20,7 +20,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let port;
 
 class Bot {
-  constructor(name, delay = 0) { this.name = name; this.delay = delay; this.userId = crypto.randomUUID(); this.msgs = []; this.state = null; this.profile = null; this.errors = []; }
+  constructor(name, delay = 0, guest = false) { this.name = name; this.delay = delay; this.guest = guest; this.userId = crypto.randomUUID(); this.msgs = []; this.state = null; this.profile = null; this.errors = []; }
   async connect(hello = true) {
     this.ws = new WebSocket(`ws://localhost:${port}`);
     this.ws.on('message', d => {
@@ -31,7 +31,7 @@ class Bot {
       if (this.onmsg) this.onmsg(m);
     });
     await new Promise(r => this.ws.on('open', r));
-    if (hello) { this.send({ type: 'hello', ticket: _test.createTestTicket(this.userId), name: this.name }); await this.waitFor(() => this.profile); }
+    if (hello) { this.send({ type: 'hello', ticket: _test.createTestTicket(this.userId, 60, this.guest), name: this.name }); await this.waitFor(() => this.profile); }
     return this;
   }
   send(o) { this.ws.send(JSON.stringify(o)); }
@@ -106,6 +106,34 @@ const ledger = () => _test.db.ledger;
     await b.waitFor(() => b.errors.length);
     assert.strictEqual(b.errors[0].code, 'bad_ticket');
     b.close();
+  });
+  await test('guest can use Quick Play only and cannot earn or spend Coins', async () => {
+    const guest = await new Bot('Guest Player', 0, true).connect();
+    const matchesBefore = _test.db.matches.length, ledgerBefore = ledger().length;
+    try {
+      assert.strictEqual(guest.profile.guest, true);
+      assert.strictEqual(guest.profile.coins, 0);
+      guest.send({ type: 'create_room', config: { rounds: 1 } });
+      await guest.waitFor(() => guest.errors.length);
+      assert.strictEqual(guest.errors[0].code, 'guest_restricted');
+      guest.errors.length = 0;
+      guest.send({ type: 'quick_play' });
+      const lobby = await guest.waitFor(() => guest.state && guest.state.publicMatch && guest.state.state === 'WAITING' && guest.state);
+      assert.strictEqual(lobby.players[0].guest, true);
+      guest.send({ type: 'shop_list' });
+      await guest.waitFor(() => guest.errors.length);
+      assert.strictEqual(guest.errors[0].code, 'guest_restricted');
+      assert.strictEqual(_test.db.players['guest:' + guest.userId].coins, 0);
+      guest.send({ type: 'leave_room' });
+      await guest.waitFor(() => guest.msgs.find(m => m.type === 'left'));
+      assert.strictEqual(_test.db.matches.length, matchesBefore);
+      assert.strictEqual(ledger().length, ledgerBefore);
+      assert.strictEqual(_test.db.players['guest:' + guest.userId], undefined, 'guest profile is discarded after leaving');
+      const savedPlayers = fs.existsSync(process.env.DATA_FILE) ? JSON.parse(fs.readFileSync(process.env.DATA_FILE, 'utf8')).players : {};
+      assert.strictEqual(savedPlayers['guest:' + guest.userId], undefined, 'guest profiles are never persisted');
+    } finally {
+      guest.close();
+    }
   });
 
   await test('Quick Play enters a public lobby immediately and starts when another player joins', async () => {

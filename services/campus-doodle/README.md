@@ -1,6 +1,6 @@
 # Campus Doodle
 
-Standalone real-time multiplayer drawing & guessing game. CampusVoice login is required for play and account-linked Coins.
+Standalone real-time multiplayer drawing & guessing game. Guests can play Quick Play without signing in; CampusVoice login is required for private rooms and account-linked Coins.
 Node.js server (WebSocket) + plain HTML/CSS/JS client. Account-linked Coin balances are stored in Supabase; player cosmetics, match history, and the leaderboard are stored in `data/db.json`.
 
 ## Run locally from CampusVoice
@@ -11,7 +11,7 @@ npm run game:doodle:test  # end-to-end tests (real server, real WebSocket bots)
 ```
 Keep CampusVoice running in another terminal. The `/games/campus-doodle` page embeds this service. Use **Quick Play** to enter a public waiting lobby immediately, even when no other players are online. Other players can join the same lobby using Quick Play, with no room code or invite; the match starts automatically once at least two players are present. Quick Play has endless rounds and no Coins payout; it returns to a public lobby when fewer than two players remain. To play privately, create a room and invite friends with its 5-letter code; private matches keep their configured round limit and normal reward rules. Use the **Full screen** button while playing for an immersive layout; the game rearranges its player list, canvas, and chat for landscape screens.
 
-Campus Doodle requires a signed-in CampusVoice account. Run `supabase/campus-doodle.sql` in the Supabase SQL Editor to create the account-linked Coin wallet. Set `CAMPUS_DOODLE_AUTH_SECRET` in the root `.env.local`; `game:doodle` reads the shared secret and optional Supabase server credentials from that file. Coins earned in eligible private matches and spent in the shop are stored in Supabase by CampusVoice user ID, so they persist across browsers and game-service restarts. Player names, cosmetics, match history, and leaderboard data remain in the game service's local data file.
+Guests can join endless Quick Play from CampusVoice without signing in. Guest identities are limited to public Quick Play and do not receive persistent Coins, leaderboard, shop, inventory, or history access. Run `supabase/campus-doodle.sql` in the Supabase SQL Editor to create the account-linked Coin wallet. Set `CAMPUS_DOODLE_AUTH_SECRET` in the root `.env.local`; `game:doodle` reads the shared secret and optional Supabase server credentials from that file. Coins earned in eligible private matches and spent in the shop are stored in Supabase by CampusVoice user ID, so they persist across browsers and game-service restarts. Player names, cosmetics, match history, and leaderboard data remain in the game service's local data file.
 
 ## Deploy publicly (Vercel + Render)
 The Next.js CampusVoice app can run on Vercel, but the multiplayer game needs a separate Node service with WebSocket support. The repository-root `render.yaml` configures a free Render web service for the game.
@@ -37,6 +37,6 @@ The included Blueprint uses Render's free plan: the service may spin down when i
 - Shop prices/ownership/balance are checked on the server; each purchase uses an idempotency key and a transaction (no double charge, no negative balance).
 
 ## Notes / limitations
-- Players are identified by their signed-in CampusVoice user ID. Quick Play places players into the public lobby; other players see only the game name. Coins remain attached to the account even after browser data is cleared.
+- Signed-in players are identified by their CampusVoice user ID; guests have a temporary browser-session identity. Quick Play places players into the public lobby; other players see only their display name and whether they are a guest. Account Coins remain attached to the CampusVoice account even after browser data is cleared.
 - Guesses are not stored individually (only match results); no profanity filter on names/chat.
 - Storage is a single JSON file, fine for a school/friends scale. Move to SQLite/Postgres if it grows.

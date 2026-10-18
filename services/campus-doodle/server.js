@@ -31,7 +31,11 @@ function saveDb() {
   if (failSave) throw new Error('simulated save failure');
   fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
+  const persisted = {
+    ...db,
+    players: Object.fromEntries(Object.entries(db.players).filter(([, player]) => player.guest !== true))
+  };
+  fs.writeFileSync(tmp, JSON.stringify(persisted));
   fs.renameSync(tmp, DATA_FILE);
 }
 /** Run fn as one all-or-nothing unit: any throw (including a failed disk write) restores the previous state. */
@@ -50,19 +54,22 @@ function tx(fn) {
 const ITEMS = new Map(C.ITEMS.map(i => [i.id, i]));
 const publicItem = i => ({ id: i.id, name: i.name, type: i.type, price: i.price, desc: i.desc, style: i.style, maxOwned: i.maxOwned });
 
-function ensureProfile(id, name) {
+function ensureProfile(id, name, persist = true) {
   let p = db.players[id];
   let dirty = false;
   if (!p) {
     p = db.players[id] = { name, coins: 0, inventory: {}, equipped: {}, createdAt: Date.now(), stats: { matches: 0, wins: 0, coinsEarned: 0, totalScore: 0 } };
     dirty = true;
   } else if (name && p.name !== name) { p.name = name; dirty = true; }
-  if (dirty) { try { saveDb(); } catch (e) { console.error('save failed', e.message); } }
+  if (dirty && persist) { try { saveDb(); } catch (e) { console.error('save failed', e.message); } }
   return p;
+}
+function forgetGuest(id) {
+  if (db.players[id] && db.players[id].guest === true) delete db.players[id];
 }
 function profileView(id) {
   const p = db.players[id];
-  return { name: p.name, coins: p.coins, inventory: p.inventory, equipped: p.equipped, stats: p.stats };
+  return { name: p.name, coins: p.coins, guest: p.guest === true, inventory: p.inventory, equipped: p.equipped, stats: p.stats };
 }
 function credit(id, amount, type, source, matchId, key) {
   if (!(amount > 0) || !Number.isInteger(amount)) throw new Error('bad credit');
@@ -78,9 +85,9 @@ function credit(id, amount, type, source, matchId, key) {
 /* ────────────────────────────── helpers ────────────────────────────── */
 const now = () => Date.now();
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
+const hue = id => parseInt(sha(id).slice(0, 4), 16) % 360;
 const clampInt = (v, lo, hi, def) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : def; };
 const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-const hue = id => parseInt(id.slice(0, 4), 16) % 360;
 const pick = arr => arr[crypto.randomInt(arr.length)];
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function cleanName(s) {
@@ -144,9 +151,12 @@ function verifyTicket(ticket) {
   try {
     const body = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
     const nowSeconds = Math.floor(now() / 1000);
-    if (typeof body.sub !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(body.sub)
+    const guest = typeof body.sub === 'string' && body.sub.startsWith('guest:');
+    const id = guest ? body.sub.slice(6) : body.sub;
+    if (typeof id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id)
+      || (body.guest !== undefined && body.guest !== true) || (body.guest === true) !== guest
       || !Number.isSafeInteger(body.exp) || body.exp <= nowSeconds || body.exp > nowSeconds + 600) return null;
-    return { id: body.sub.toLowerCase(), exp: body.exp };
+    return { id: guest ? `guest:${id.toLowerCase()}` : id.toLowerCase(), exp: body.exp, guest };
   } catch (_) { return null; }
 }
 async function walletRpc(name, args) {
@@ -169,8 +179,8 @@ async function walletRpc(name, args) {
 async function getCoins(id) {
   return persistentCoins ? walletRpc('campus_doodle_get_coins', { p_user_id: id }) : (db.players[id] ? db.players[id].coins : 0);
 }
-function makeTestTicket(id, lifetimeSeconds = 60) {
-  const payload = Buffer.from(JSON.stringify({ sub: id, exp: Math.floor(now() / 1000) + lifetimeSeconds })).toString('base64url');
+function makeTestTicket(id, lifetimeSeconds = 60, guest = false) {
+  const payload = Buffer.from(JSON.stringify({ sub: guest ? `guest:${id}` : id, exp: Math.floor(now() / 1000) + lifetimeSeconds, ...(guest ? { guest: true } : {}) })).toString('base64url');
   return `${payload}.${crypto.createHmac('sha256', authSecret).update(payload).digest('base64url')}`;
 }
 
@@ -183,7 +193,7 @@ function cleanConfig(c = {}) {
 }
 let joinCounter = 0;
 function addPlayer(room, id, name) {
-  const p = { id, name, order: joinCounter++, connected: true, dcAt: 0, left: false, score: 0, correct: 0, fast: 0, turnsPresent: 0 };
+  const p = { id, name, guest: db.players[id] && db.players[id].guest === true, order: joinCounter++, connected: true, dcAt: 0, left: false, score: 0, correct: 0, fast: 0, turnsPresent: 0 };
   room.players.set(id, p);
   playerRoom.set(id, room.code);
   return p;
@@ -203,6 +213,7 @@ function snapshot(room, viewerId) {
   const m = room.match, t = room.turn;
   const players = [...room.players.values()].map(p => ({
     id: p.id, name: p.name, score: p.score, connected: p.connected, left: p.left, hue: hue(p.id),
+    guest: p.guest === true,
     host: p.id === room.hostId,
     artist: !!t && room.state === 'DRAWING' && t.artistId === p.id,
     guessed: !!t && t.guessed.has(p.id),
@@ -497,6 +508,7 @@ function tickRoom(room, t) {
     if (!p.connected && !p.left && t - p.dcAt > C.RECONNECT_GRACE_MS) {
       if (room.state === 'WAITING' || room.state === 'MATCH_FINISHED') { room.players.delete(p.id); if (playerRoom.get(p.id) === room.code) playerRoom.delete(p.id); sys(room, `${p.name} timed out.`); broadcastState(room); }
       else { p.left = true; sys(room, `${p.name} left the match.`); broadcastState(room); }
+      if (p.guest) forgetGuest(p.id);
     }
   }
   const host = room.players.get(room.hostId);
@@ -574,7 +586,10 @@ function sweep() {
       const anyone = connectedPlayers(room).length > 0;
       if (anyone) room.emptySince = null; else room.emptySince = room.emptySince || t;
       if ((room.emptySince && t - room.emptySince > C.ROOM_IDLE_MS) || t - room.createdAt > C.ROOM_TTL_MS) {
-        for (const p of room.players.values()) if (playerRoom.get(p.id) === room.code) playerRoom.delete(p.id);
+        for (const p of room.players.values()) {
+          if (playerRoom.get(p.id) === room.code) playerRoom.delete(p.id);
+          if (p.guest) forgetGuest(p.id);
+        }
         const startTimer = publicStartTimers.get(room);
         if (startTimer) clearTimeout(startTimer);
         publicStartTimers.delete(room);
@@ -651,13 +666,30 @@ async function onHello(ctx, msg) {
   }
   const id = identity.id;
   const alreadyAuthenticated = ctx.id === id;
+  if (alreadyAuthenticated && ctx.isGuest !== identity.guest) {
+    err(ctx, 'Refresh Campus Doodle to change account sessions.', 'session_conflict');
+    return;
+  }
   let balance;
   try {
-    balance = alreadyAuthenticated && db.players[id] ? db.players[id].coins : await getCoins(id);
+    balance = identity.guest ? 0 : alreadyAuthenticated && db.players[id] ? db.players[id].coins : await getCoins(id);
     if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Campus Doodle Coin balance is invalid.');
   } catch (e) {
     console.error('Could not load Campus Doodle account Coins:', e.message);
     return err(ctx, 'Could not load your Campus Doodle account. Please reconnect.', 'account_unavailable');
+  }
+  if (ctx.id && ctx.id !== id) {
+    const oldId = ctx.id;
+    if (sockets.get(oldId) === ctx.ws) sockets.delete(oldId);
+    const oldCode = playerRoom.get(oldId);
+    const oldRoom = oldCode && rooms.get(oldCode);
+    const oldPlayer = oldRoom && oldRoom.players.get(oldId);
+    if (oldPlayer && !oldPlayer.left) {
+      oldPlayer.connected = false;
+      oldPlayer.dcAt = now();
+      sys(oldRoom, `${oldPlayer.name} disconnected.`);
+      broadcastState(oldRoom);
+    }
   }
   const prior = sockets.get(id);
   if (prior && prior !== ctx.ws) { send(prior, { type: 'replaced' }); clients.get(prior) && (clients.get(prior).id = null); try { prior.close(); } catch (_) { /* ignore */ } }
@@ -665,6 +697,7 @@ async function onHello(ctx, msg) {
   const existing = db.players[id];
   const name = wanted || (existing && existing.name) || 'Player' + crypto.randomInt(1000, 9999);
   ctx.id = id;
+  ctx.isGuest = identity.guest;
   ctx.authExpiresAt = identity.exp * 1000;
   if (ctx.authTimer) clearTimeout(ctx.authTimer);
   ctx.authTimer = setTimeout(() => {
@@ -672,9 +705,12 @@ async function onHello(ctx, msg) {
   }, Math.max(0, ctx.authExpiresAt - now()));
   if (typeof ctx.authTimer.unref === 'function') ctx.authTimer.unref();
   sockets.set(id, ctx.ws);
-  const prof = ensureProfile(id, name);
+  const prof = ensureProfile(id, name, !identity.guest);
+  prof.guest = identity.guest;
   prof.coins = balance;
-  try { saveDb(); } catch (e) { console.error('Could not update local Campus Doodle cache:', e.message); }
+  if (!identity.guest) {
+    try { saveDb(); } catch (e) { console.error('Could not update local Campus Doodle cache:', e.message); }
+  }
   send(ctx.ws, { type: 'hello', profile: profileView(id), catalog: C.ITEMS.filter(i => i.active).map(publicItem), config: { rounds: C.ROUNDS, drawTime: C.DRAW_TIME, rewards: C.REWARDS, maxPlayers: C.MAX_PLAYERS, minPlayers: C.MIN_PLAYERS_TO_START, rewardMinPlayers: C.MIN_PLAYERS_FOR_REWARD } });
   const room = roomOf(ctx);
   if (room && room.players.has(id)) {
@@ -720,6 +756,7 @@ function onLeave(ctx) {
   if (!room) return;
   const inMatch = ['STARTING', 'DRAWING', 'ROUND_RESULTS', 'NEXT_ROUND'].includes(room.state);
   removeFromRoom(room, ctx.id, { forfeit: inMatch });
+  if (ctx.isGuest) forgetGuest(ctx.id);
   send(ctx.ws, { type: 'left' });
   if (inMatch && room.publicMatch && rooms.has(room.code)
     && connectedPlayers(room).length < C.MIN_PLAYERS_TO_START) pausePublicMatch(room);
@@ -1011,6 +1048,9 @@ async function route(ctx, msg) {
     err(ctx, 'Your CampusVoice login expired. Refresh the game page and try again.', 'bad_ticket');
     ctx.ws.close(4001, 'CampusVoice login expired');
     return;
+  }
+  if (ctx.isGuest && !['quick_play', 'leave_room', 'draw', 'guess', 'choose_word'].includes(msg.type)) {
+    return err(ctx, 'Guest access is limited to Quick Play. Log in to use private rooms, Coins, and saved game features.', 'guest_restricted');
   }
   if (msg.type === 'draw') { if (!take(ctx.draw)) { ctx.violations++; return; } return onDraw(ctx, msg); }
   if (!take(ctx.general)) { ctx.violations++; return; }

@@ -31,7 +31,7 @@
   <section id="v-home" class="view">
     <div class="hero card">
       <h1>Draw it. Guess it. Win Coins.</h1>
-      <p class="muted">Play with friends in a private room or join strangers with Quick Play. Log in with CampusVoice to play and keep your Coins.</p>
+      <p class="muted">Join random players in Quick Play without logging in. Log in with CampusVoice for private rooms, Coins, and saved game features.</p>
       <label class="field">Your name
         <input id="name" maxlength="16" autocomplete="off" placeholder="2–16 letters or numbers">
       </label>
@@ -42,7 +42,8 @@
         </div>
         <button class="btn primary" id="quick-play" type="button">Quick Play</button>
       </div>
-      <div class="split">
+      <p class="muted small" id="guest-note" hidden>Guest mode is limited to endless Quick Play. Guest games do not earn or save Coins. Log in to CampusVoice for private rooms, leaderboard, shop, inventory, and history.</p>
+      <div class="split" id="private-play">
         <div class="panel">
           <h2>Create a room</h2>
           <label class="field">Rounds

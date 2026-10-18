@@ -9,8 +9,15 @@ export default function CampusDoodleFrame({ gameUrl }: { gameUrl: string }) {
 
   const sendTicket = useCallback(async () => {
     try {
+      let guestId = window.sessionStorage.getItem("campus-doodle-guest-id");
+      if (!guestId) {
+        guestId = window.crypto.randomUUID();
+        window.sessionStorage.setItem("campus-doodle-guest-id", guestId);
+      }
       const response = await fetch("/api/campus-doodle/session", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestId }),
         cache: "no-store",
       });
       const data = await response.json();

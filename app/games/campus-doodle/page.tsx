@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import CampusDoodleFrame from "@/components/games/CampusDoodleFrame";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 
@@ -30,7 +29,6 @@ function getCampusDoodleUrl() {
 export default async function CampusDoodlePage() {
   const { user, error } = await getAuthUser(createClient());
   if (error) throw new Error(`Could not verify your login: ${error.message}`);
-  if (!user) redirect("/login?next=%2Fgames%2Fcampus-doodle");
 
   const gameUrl = getCampusDoodleUrl();
 
@@ -44,8 +42,11 @@ export default async function CampusDoodlePage() {
         <Link href="/games" className="btn-ghost">All games</Link>
       </header>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Draw clues and guess with friends in real time. Log in to your CampusVoice account to play and keep your Coins; no subscription is required.
+        {user
+          ? "Draw clues and guess with friends in real time. Quick Play is endless and does not award Coins; log in to use private rooms and save your Coins."
+          : "Play Quick Play with random players without logging in. Guest games do not earn or save Coins; log in to create private rooms, use the shop, or keep your Coins."}
       </p>
+      {!user && <Link href="/login?next=%2Fgames%2Fcampus-doodle" className="btn-primary inline-flex">Log in to CampusVoice</Link>}
       {gameUrl ? (
         <CampusDoodleFrame gameUrl={gameUrl} />
       ) : (

@@ -71,7 +71,7 @@ let replaced = false;
 
 function onMsg(m) {
   switch (m.type) {
-    case 'hello': profile = m.profile; catalog = m.catalog; limits = m.config; if (!myName) { myName = profile.name; localStorage.setItem('cd_name', myName); } initHome(); updateCoins(); break;
+    case 'hello': profile = m.profile; catalog = m.catalog; limits = m.config; if (!myName) { myName = profile.name; localStorage.setItem('cd_name', myName); } initHome(); updateCoins(); setGuestMode(profile.guest); break;
     case 'profile': profile = m.profile; updateCoins(); break;
     case 'state': onState(m.state); break;
     case 'chat': addChat(m.msg); break;
@@ -93,7 +93,18 @@ function onMsg(m) {
     default:
   }
 }
-function updateCoins() { if (profile) $('#coins').textContent = profile.coins + ' Coins'; }
+function updateCoins() {
+  if (!profile) return;
+  $('#coins').textContent = profile.guest ? 'Guest · no Coins' : profile.coins + ' Coins';
+  $('#coins').title = profile.guest ? 'Guest Quick Play does not earn or save Coins' : 'Your Coins';
+}
+function setGuestMode(guest) {
+  document.body.classList.toggle('guest-mode', guest);
+  $$('.nav button').forEach(button => {
+    if (button.dataset.view !== 'home') button.hidden = guest;
+  });
+  $('#guest-note').hidden = !guest;
+}
 
 /* ───────── views ───────── */
 function setView(v) {
@@ -191,7 +202,7 @@ function renderRoom() {
   for (const p of room.players) {
     list.append(h('li', { class: 'pl' + (p.artist ? ' artist' : '') + (p.guessed ? ' guessed' : '') + (!p.connected || p.left ? ' off' : '') },
       avatar(p),
-      h('div', {}, h('div', { class: 'nm', text: badgeOf(p) + p.name + (p.id === room.you ? ' (you)' : '') }),
+      h('div', {},       h('div', { class: 'nm', text: badgeOf(p) + p.name + (p.guest ? ' · guest' : '') + (p.id === room.you ? ' (you)' : '') }),
         h('div', { class: 'sub', text: p.left ? 'left' : !p.connected ? 'reconnecting…' : p.artist ? 'drawing' : p.guessed ? 'guessed it' : p.host ? 'host' : '' }),
         titleOf(p) ? h('div', { class: 'title-tag', text: titleOf(p) }) : null),
       h('div', { class: 'sc', text: String(p.score) })));
