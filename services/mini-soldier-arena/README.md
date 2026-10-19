@@ -9,7 +9,7 @@ Online 2D jetpack shooter. Phaser 3 + TypeScript + Vite (game) and Node.js + Col
 This game is included in the CampusVoice repository's root `render.yaml` as two Render services:
 
 - `mini-soldier-arena-server`: Colyseus multiplayer server with a `/health` endpoint.
-- `mini-soldier-arena-client`: Vite static site; its WebSocket host is connected to the server service by the Blueprint.
+- `mini-soldier-arena-client`: Vite static site; its `VITE_SERVER_URL` is set in the Blueprint to the public secure WebSocket URL of the server.
 
 In Render, open the CampusVoice Blueprint and sync/deploy the latest repository changes. After the client static site is live, copy its HTTPS URL and set `MINI_SOLDIER_ARENA_URL` to that URL in the CampusVoice web app's hosting environment (for example, Vercel if that is where the main app is deployed). Redeploy the CampusVoice web app after setting it.
 

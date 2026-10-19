@@ -36,8 +36,5 @@ services:
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_SERVER_HOST
-        fromService:
-          type: web
-          name: mini-soldier-arena-server
-          property: host
+      - key: VITE_SERVER_URL
+        value: wss://mini-soldier-arena-server.onrender.com
