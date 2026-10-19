@@ -70,6 +70,19 @@ export default async function GamesPage() {
       icon: "✦",
       visual: "striker",
     },
+    {
+      id: "mini-soldier-arena",
+      title: "Mini Soldier Arena",
+      tagline: "Gear up. Team up. Battle.",
+      category: "MULTIPLAYER · 2D SHOOTER",
+      description: "Jetpack into real-time arena battles, play solo or in teams, and challenge friends in private rooms. Free to play.",
+      href: "/games/mini-soldier-arena",
+      cta: "Play free",
+      registerHref: undefined,
+      logoKey: "",
+      icon: "⚔",
+      visual: "soldier-arena",
+    },
   ];
 
   return (
@@ -119,6 +132,17 @@ export default async function GamesPage() {
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="game-arcade-promo"
                   />
+                ) : game.visual === "soldier-arena" ? (
+                  <div className="soldier-arena-art" aria-hidden="true">
+                    <svg viewBox="0 0 220 140">
+                      <path d="M0 112h220M18 112l18-28h34l12 28m74 0 12-34h28l14 34" fill="none" stroke="#38bdf8" strokeOpacity=".34" strokeWidth="3" />
+                      <path d="M94 93 83 112m45-19 11 19" fill="none" stroke="#7dd3fc" strokeLinecap="round" strokeWidth="8" />
+                      <path d="m91 68 12-16h19l13 19-8 27H93z" fill="#38bdf8" />
+                      <circle cx="112" cy="37" r="15" fill="#bae6fd" />
+                      <path d="m126 66 28-11 6 7-29 18" fill="none" stroke="#fbbf24" strokeLinecap="round" strokeLinejoin="round" strokeWidth="8" />
+                      <path d="m78 70-17-10m101-23 8-8m-1 36 13 3" fill="none" stroke="#7dd3fc" strokeLinecap="round" strokeWidth="3" />
+                    </svg>
+                  </div>
                 ) : (
                   <div className="doodle-art" aria-hidden="true">
                     <svg viewBox="0 0 180 120">

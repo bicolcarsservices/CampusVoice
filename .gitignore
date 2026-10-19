@@ -6,6 +6,7 @@ build/
 coverage/
 .vercel/
 services/campus-doodle/data/
+services/mini-soldier-arena/client/dist/
 
 .env*
 !.env.example

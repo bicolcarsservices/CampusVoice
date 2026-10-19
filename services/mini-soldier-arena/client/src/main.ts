@@ -1,0 +1,175 @@
+import Phaser from 'phaser';
+import { Client, Room } from 'colyseus.js';
+import { SERVER_URL, GAME_W, GAME_H, AUTO_QUICKPLAY } from './config';
+import { Net } from './net';
+import { RoomChat, TeamVoice } from './communications';
+import { initLobby, showLobby, showWaitingRoom, hideLobby, loadName, explain } from './lobby';
+import { runLoading } from './loading';
+import { isTouchDevice, isFullscreen, isLandscape, goFullscreenLandscape } from './device';
+import * as audio from './audio';
+import { WEAPONS } from './shared/weapons';
+import { BootScene } from './scenes/BootScene';
+import { GameScene } from './scenes/GameScene';
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const client = new Client(SERVER_URL);
+let game: Phaser.Game | null = null;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function stopGame() {
+  audio.jet(false);
+  game?.destroy(true);
+  game = null;
+}
+
+// ---- sound button, full screen button ----
+const muteBtn = $<HTMLButtonElement>('mute');
+const syncMute = () => { muteBtn.textContent = audio.isMuted() ? 'Sound: Off' : 'Sound: On'; };
+muteBtn.onclick = () => { audio.unlockAudio(); audio.setMuted(!audio.isMuted()); syncMute(); };
+muteBtn.addEventListener('sync', syncMute);
+syncMute();
+const goFs = () => { void goFullscreenLandscape(); };
+$('fs').onclick = goFs;
+$('fshint').onclick = goFs;
+const updateFsHint = () => document.body.classList.toggle('needfs', isTouchDevice() && !isFullscreen());
+document.addEventListener('fullscreenchange', updateFsHint);
+
+// First tap on a phone goes full screen + landscape; first touch or key also unlocks sound.
+const firstGesture = () => {
+  audio.unlockAudio();
+  if (document.body.classList.contains('ingame') && isTouchDevice() && (!isFullscreen() || !isLandscape())) goFs();
+};
+document.addEventListener('pointerup', firstGesture);
+document.addEventListener('keydown', () => audio.unlockAudio());
+
+function enter(room: Room, waitForPlayers = false) {
+  const net = new Net(room);
+  new RoomChat(room);
+  new TeamVoice(room);
+  const token = room.reconnectionToken;
+  let leftOnPurpose = false;
+  let roomLeft = false;
+  let loading = false;
+  let loadId = 0;
+
+  $<HTMLButtonElement>('leave').onclick = () => { leftOnPurpose = true; void room.leave(); };
+
+  room.onLeave(async (code: number) => {
+    roomLeft = true;
+    loadId++;
+    document.body.classList.remove('chat-open');
+    $('chatToggle').setAttribute('aria-expanded', 'false');
+    $('chatToggle').setAttribute('aria-label', 'Open chat');
+    $('voiceStatus').setAttribute('hidden', '');
+    $('matchLoading').classList.remove('active');
+    stopGame();
+    if (leftOnPurpose || code === 1000) { showLobby(); return; }
+    if (code === 4002) { showLobby('Disconnected: too many messages sent.'); return; }
+    // unexpected disconnect: try to get back into the same room
+    for (let i = 0; i < 3; i++) {
+      try {
+        const back = await client.reconnect(token);
+        enter(back, waitForPlayers);
+        return;
+      } catch {
+        await sleep(1500);
+      }
+    }
+    showLobby('Lost connection to the server.');
+  });
+
+  const startMatch = async () => {
+    if (loading || roomLeft) return;
+    loading = true;
+    const currentLoad = ++loadId;
+    const title = net.welcome?.code === 'PUBLIC' ? 'Loading Quick Play match...' : 'Loading multiplayer match...';
+    $('matchLoadingTitle').textContent = title;
+    $('matchMessage').textContent = 'Preparing the arena';
+    $('matchLoading').classList.add('active');
+    const fill = $('matchFill'), pct = $('matchPct');
+    const files = ['assets/soldier.png', 'assets/head.png', ...[...Object.keys(WEAPONS), 'grenade', 'pineapple'].map((k) => `assets/weapons/${k}.png`)];
+    try {
+      await runLoading(files, (p) => {
+        const value = Math.round(p * 100);
+        fill.style.width = `${value}%`;
+        pct.textContent = `${value}%`;
+      });
+      if (currentLoad !== loadId || roomLeft) return;
+      hideLobby();
+      $('matchLoading').classList.remove('active');
+      updateFsHint();
+      game = new Phaser.Game({
+        type: Phaser.AUTO,
+        parent: 'game',
+        width: GAME_W,
+        height: GAME_H,
+        backgroundColor: '#0b1a10',
+        scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+        input: { activePointers: 3 },
+        scene: [BootScene, GameScene],
+        callbacks: { preBoot: (g) => { g.registry.set('net', net); } },
+      });
+    } catch (error) {
+      $('matchLoading').classList.remove('active');
+      showLobby(explain(error));
+    }
+  };
+
+  if (waitForPlayers) {
+    const renderWaiting = () => showWaitingRoom(
+      net.welcome?.code ?? '',
+      net.lobby,
+      net.welcome?.mode ?? 'teams',
+      () => { leftOnPurpose = true; void room.leave(); },
+    );
+    net.onWelcome = () => {
+      renderWaiting();
+      if (net.started) void startMatch();
+    };
+    net.onLobby = () => renderWaiting();
+    net.onStart = () => { void startMatch(); };
+    renderWaiting();
+    if (net.started) void startMatch();
+  } else {
+    void startMatch();
+  }
+}
+
+initLobby(client, enter);
+
+$<HTMLButtonElement>('chatToggle').onclick = () => {
+  const open = document.body.classList.toggle('chat-open');
+  $('chatToggle').setAttribute('aria-expanded', String(open));
+  $('chatToggle').setAttribute('aria-label', open ? 'Close chat' : 'Open chat');
+};
+
+// ---- start-up: title picture with a loading bar, then straight into a match ----
+async function boot() {
+  const fill = $('fill'), pct = $('pct'), msg = $('loadmsg'), splash = $('splash');
+  const files = ['assets/soldier.png', 'assets/head.png', ...[...Object.keys(WEAPONS), 'grenade', 'pineapple'].map((k) => `assets/weapons/${k}.png`)];
+  await runLoading(files, (p) => { fill.style.width = `${Math.round(p * 100)}%`; pct.textContent = `${Math.round(p * 100)}%`; });
+
+  if (AUTO_QUICKPLAY) {
+    msg.textContent = 'Joining a match...';
+    try {
+      const name = loadName() || `Soldier${Math.floor(Math.random() * 900 + 100)}`;
+      enter(await client.joinOrCreate('arena', { code: 'PUBLIC', name }));
+    } catch (e) {
+      showLobby(explain(e));
+    }
+  } else {
+    showLobby();
+    const inviteCode = new URLSearchParams(window.location.search).get('room')?.trim().toUpperCase();
+    if (inviteCode) {
+      if (/^[A-Z0-9]{4,8}$/.test(inviteCode)) {
+        $<HTMLInputElement>('code').value = inviteCode;
+        $<HTMLButtonElement>('join').click();
+      } else {
+        $('msg').textContent = 'This room link has an invalid code.';
+      }
+    }
+  }
+  splash.classList.add('gone');
+  setTimeout(() => splash.remove(), 800);
+}
+void boot();

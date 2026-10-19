@@ -38,6 +38,8 @@
   ],
   "exclude": [
     "node_modules",
+    "services/mini-soldier-arena/client",
+    "services/mini-soldier-arena/server",
     "CampusVoice"
   ]
 }
