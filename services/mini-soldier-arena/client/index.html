@@ -162,6 +162,23 @@
     #bar2 { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: none; gap: 6px; }
     body.ingame #bar2 { display: flex; }
     #bar2 button { width: auto; margin: 0; padding: 7px 11px; font-size: 13px; background: rgba(45, 65, 86, 0.85); color: var(--text); }
+    #controlSettings { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; padding: 14px; background: #000b; }
+    #controlSettings.open { display: flex; }
+    #controlSettingsPanel { width: min(94vw, 540px); max-height: 90vh; overflow: auto; padding: 18px; border: 1px solid #59677b; border-radius: 16px; background: #111a30; box-shadow: 0 18px 60px #000b; touch-action: pan-y; }
+    #controlSettingsPanel h2 { margin: 0 0 6px; font-size: 22px; }
+    #controlSettingsPanel p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+    .settingsRow { display: grid; grid-template-columns: 1fr minmax(100px, 180px); align-items: center; gap: 12px; margin: 9px 0; color: var(--text); font-size: 13px; }
+    .settingsRow input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
+    #keyBindings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .keyBinding { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px; border: 1px solid #ffffff24; border-radius: 8px; color: var(--muted); font-size: 12px; }
+    .keyBinding button { width: auto; min-width: 55px; margin: 0; padding: 6px 9px; background: #2d4156; color: white; font-family: monospace; }
+    .settingsActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+    .settingsActions button { min-width: 0; margin: 0; padding: 8px 5px; font-size: 12px; }
+    #arrangeControls { grid-column: 1 / -1; }
+    #layoutEditBar { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 31; display: none; width: min(94vw, 420px); padding: 9px 12px; border: 1px solid #ffdf6e; border-radius: 12px; background: #111a30ee; color: white; text-align: center; transform: translateX(-50%); pointer-events: none; }
+    #layoutEditBar button { width: auto; margin: 0 0 0 8px; padding: 6px 12px; pointer-events: auto; }
+    body.editing-controls #layoutEditBar { display: block; }
+    @media (max-width: 480px) { #keyBindings { grid-template-columns: 1fr; } .settingsRow { grid-template-columns: 1fr minmax(100px, 42%); } }
     #fshint { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 6; display: none; background: rgba(0,0,0,0.7); color: #fff; padding: 8px 14px; border-radius: 99px; font-size: 14px; }
     body.ingame.needfs #fshint { display: block; }
 
@@ -190,7 +207,23 @@
   </div>
 
   <div id="fshint">Tap here for full screen</div>
-  <div id="bar2"><button id="mute">Sound: On</button><button id="fs">Full screen</button><button id="leave">Leave</button></div>
+  <div id="bar2"><button id="mute">Sound: On</button><button id="settings">Settings</button><button id="fs">Full screen</button><button id="leave">Leave</button></div>
+  <section id="controlSettings" aria-label="Game controls settings">
+    <div id="controlSettingsPanel">
+      <h2>Controls & settings</h2>
+      <p>Your layout and key bindings are saved on this device.</p>
+      <label class="settingsRow" for="controlSize"><span>Touch control size</span><input id="controlSize" type="range" min="0.65" max="1.5" step="0.05" /></label>
+      <label class="settingsRow" for="controlOpacity"><span>Touch control opacity</span><input id="controlOpacity" type="range" min="0.25" max="1" step="0.05" /></label>
+      <h3>Keyboard bindings</h3>
+      <div id="keyBindings"></div>
+      <div class="settingsActions">
+        <button id="arrangeControls" class="alt">Arrange touch controls</button>
+        <button id="resetControls" class="alt">Reset defaults</button>
+        <button id="closeSettings">Done</button>
+      </div>
+    </div>
+  </section>
+  <div id="layoutEditBar">Drag each control to move it. <button id="finishLayout">Done</button></div>
   <div id="gameDock" aria-label="Chat and voice controls">
     <button id="chatToggle" aria-label="Open chat" aria-expanded="false" title="Open room chat">Chat</button>
     <button id="voiceToggle" aria-label="Microphone off" aria-pressed="false" disabled title="Team voice">Mic</button>

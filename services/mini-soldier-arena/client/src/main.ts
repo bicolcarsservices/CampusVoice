@@ -10,16 +10,20 @@ import * as audio from './audio';
 import { WEAPONS } from './shared/weapons';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
+import { ACTION_IDS, ACTION_LABELS, ActionId, getControlSettings, resetControlSettings, updateControlSettings, updateKeyBinding } from './controls';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const client = new Client(SERVER_URL);
 let game: Phaser.Game | null = null;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const controlScene = () => game?.scene.getScene('GameScene') as GameScene | undefined;
 
 function stopGame() {
   audio.jet(false);
   game?.destroy(true);
   game = null;
+  document.body.classList.remove('editing-controls');
+  document.getElementById('controlSettings')?.classList.remove('open');
 }
 
 // ---- sound button, full screen button ----
@@ -33,6 +37,77 @@ $('fs').onclick = goFs;
 $('fshint').onclick = goFs;
 const updateFsHint = () => document.body.classList.toggle('needfs', isTouchDevice() && !isFullscreen());
 document.addEventListener('fullscreenchange', updateFsHint);
+
+const settingsPanel = $('controlSettings');
+const keyBindings = $('keyBindings');
+let waitingForKey: ActionId | null = null;
+function refreshSettingsPanel() {
+  const settings = getControlSettings();
+  $<HTMLInputElement>('controlSize').value = String(settings.size);
+  $<HTMLInputElement>('controlOpacity').value = String(settings.opacity);
+  keyBindings.replaceChildren();
+  for (const action of ACTION_IDS) {
+    const row = document.createElement('div');
+    row.className = 'keyBinding';
+    const label = document.createElement('span');
+    label.textContent = ACTION_LABELS[action];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = settings.keys[action];
+    button.setAttribute('aria-label', `Change ${ACTION_LABELS[action]} key`);
+    button.onclick = () => {
+      waitingForKey = action;
+      button.textContent = 'Press key';
+      button.focus();
+    };
+    row.append(label, button);
+    keyBindings.append(row);
+  }
+}
+function closeSettings() {
+  settingsPanel.classList.remove('open');
+  waitingForKey = null;
+  controlScene()?.refreshControls();
+}
+$<HTMLButtonElement>('settings').onclick = () => {
+  refreshSettingsPanel();
+  settingsPanel.classList.add('open');
+};
+$<HTMLButtonElement>('closeSettings').onclick = closeSettings;
+settingsPanel.addEventListener('pointerdown', (event) => {
+  if (event.target === settingsPanel) closeSettings();
+});
+$<HTMLInputElement>('controlSize').oninput = (event) => {
+  updateControlSettings({ size: Number((event.currentTarget as HTMLInputElement).value) });
+};
+$<HTMLInputElement>('controlOpacity').oninput = (event) => {
+  updateControlSettings({ opacity: Number((event.currentTarget as HTMLInputElement).value) });
+};
+document.addEventListener('keydown', (event) => {
+  if (!waitingForKey) return;
+  const key = event.key === ' ' ? 'SPACE' : event.key.startsWith('Arrow') ? event.key.toUpperCase() : event.key.toUpperCase();
+  if (!/^(?:[A-Z0-9]|SPACE|ARROWLEFT|ARROWRIGHT|ARROWUP|ARROWDOWN)$/.test(key)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  updateKeyBinding(waitingForKey, key);
+  waitingForKey = null;
+  refreshSettingsPanel();
+  controlScene()?.refreshControls();
+});
+$<HTMLButtonElement>('resetControls').onclick = () => {
+  resetControlSettings();
+  refreshSettingsPanel();
+  controlScene()?.refreshControls();
+};
+$<HTMLButtonElement>('arrangeControls').onclick = () => {
+  closeSettings();
+  document.body.classList.add('editing-controls');
+  controlScene()?.setLayoutEditing(true);
+};
+$<HTMLButtonElement>('finishLayout').onclick = () => {
+  document.body.classList.remove('editing-controls');
+  controlScene()?.setLayoutEditing(false);
+};
 
 // First tap on a phone goes full screen + landscape; first touch or key also unlocks sound.
 const firstGesture = () => {
