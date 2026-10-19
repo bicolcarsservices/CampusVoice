@@ -50,6 +50,7 @@ export class GameScene extends Phaser.Scene {
   private outbox: InputCmd[] = [];
   private aim = 0;
   private facing = 1;
+  private renderCorrection = { x: 0, y: 0 };
   private thrust = false;
   private dx = 0;
   private firing = false;
@@ -124,6 +125,7 @@ export class GameScene extends Phaser.Scene {
     this.seq = 0; this.acc = 0; this.lastSend = 0; this.pending = []; this.outbox = [];
     this.nextPredictedShotId = -1; this.predictedNextShotAt = 0;
     this.aim = 0; this.facing = 1; this.thrust = false; this.dx = 0; this.firing = false;
+    this.renderCorrection = { x: 0, y: 0 };
     this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1; this.mouseOnUi = false; this.lastJetFx = 0;
     this.views = new Map(); this.items = new Map(); this.bombObjs = new Map(); this.bullets = new Map();
     this.joyPtr = null; this.aimPtr = null; this.flyPtr = null; this.joyVec = { x: 0, y: 0 };
@@ -400,7 +402,7 @@ export class GameScene extends Phaser.Scene {
           this.bullets.delete(localId);
           img = bullet.img;
           elapsed = Math.max(0, (performance.now() - bullet.createdAt) / 1000);
-          img.setPosition(bullet.originX + e.vx * elapsed, bullet.originY + e.vy * elapsed);
+          img.setPosition(e.x + e.vx * elapsed, e.y + e.vy * elapsed);
           img.setVisible(true);
         } else {
           img = this.add.image(e.x, e.y, rocket ? 'rocket' : 'bullet').setDepth(9);
@@ -413,7 +415,7 @@ export class GameScene extends Phaser.Scene {
           predicted: false, createdAt: performance.now(), originX: e.x, originY: e.y,
         });
         const a = Math.atan2(e.vy, e.vx);
-        this.flash(e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, 0xffe27a, 9, 90);
+        if (!predicted) this.flash(e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, 0xffe27a, 9, 90);
         const def = isWeapon(e.w) ? WEAPONS[e.w] : null;
         if (def && !predicted) {
           const sfx = def.cls === 'heavy' ? 'rocket' : def.cls === 'melee' ? 'knife' : def.cls;
@@ -515,13 +517,21 @@ export class GameScene extends Phaser.Scene {
     this.pending = this.pending.filter((c) => c.seq > p.ack);
     if (!this.me || p.d || wasDead) {
       this.me = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.g };
+      this.renderCorrection = { x: 0, y: 0 };
       this.pending = [];
       this.outbox = [];
       return;
     }
     const t: Body = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.g };
     for (const c of this.pending) stepBody(t, c.dx, c.thrust, this.turbo, this.solids);
-    if (Math.hypot(t.x - this.me.x, t.y - this.me.y) > 2) Object.assign(this.me, t);
+    const oldRenderX = this.me.x + this.renderCorrection.x;
+    const oldRenderY = this.me.y + this.renderCorrection.y;
+    if (Math.hypot(t.x - this.me.x, t.y - this.me.y) > 180) {
+      this.renderCorrection = { x: 0, y: 0 };
+    } else {
+      this.renderCorrection = { x: oldRenderX - t.x, y: oldRenderY - t.y };
+    }
+    this.me = t;
   }
 
   // ---------- things lying on the ground ----------
@@ -580,6 +590,9 @@ export class GameScene extends Phaser.Scene {
     if (this.world) updateBackdrop(this.world, cam);
 
     if (!this.isTyping() && this.actionJustDown('mute')) { audio.setMuted(!audio.isMuted()); document.getElementById('mute')?.dispatchEvent(new Event('sync')); }
+    const correctionDecay = Math.exp(-12 * Math.min(delta, 100) / 1000);
+    this.renderCorrection.x *= correctionDecay;
+    this.renderCorrection.y *= correctionDecay;
     this.readInput();
     this.runLocalSimulation(delta);
     this.updateBullets(delta / 1000);
@@ -699,8 +712,8 @@ export class GameScene extends Phaser.Scene {
     this.predictedNextShotAt = now + weapon.rate;
 
     const angle = this.aim + (Math.random() - 0.5) * 2 * weapon.spread;
-    const originX = body.x + Math.cos(this.aim) * 10;
-    const originY = body.y - 30 + Math.sin(this.aim) * 10;
+    const originX = body.x + this.renderCorrection.x + Math.cos(this.aim) * 10;
+    const originY = body.y + this.renderCorrection.y - 30 + Math.sin(this.aim) * 10;
     const rocket = weapon.kind === 'rocket';
     const img = this.add.image(originX, originY, rocket ? 'rocket' : 'bullet')
       .setDepth(9).setRotation(angle);
@@ -775,22 +788,24 @@ export class GameScene extends Phaser.Scene {
     const info = this.meInfo;
     const show = !this.meDead;
     const now = this.time.now;
+    const x = m.x + this.renderCorrection.x;
+    const y = m.y + this.renderCorrection.y;
     this.meSprite.setVisible(show);
     this.meLabel.setVisible(show);
-    this.meSprite.setPosition(m.x, feetToCenter(m.y));
+    this.meSprite.setPosition(x, feetToCenter(y));
     this.meSprite.setFlipX(this.facing < 0);
     // lean into the direction of flight
     this.meSprite.setAngle(m.onGround ? 0 : clamp((m.vx / SPEED) * 18, -18, 18));
     this.meSprite.setAlpha(info?.iv && Math.floor(now / 100) % 2 ? 0.4 : 1);
     this.animate(this.meSprite, m.vx, this.thrust, m.onGround, this.firing, now < this.meHurtUntil);
     const team = info?.tm ?? -1;
-    this.meLabel.setText(this.nameOf(this.myId)).setPosition(m.x, m.y - 94).setColor(team >= 0 ? TEAM_TEXT[team] : '#9dffa8');
+    this.meLabel.setText(this.nameOf(this.myId)).setPosition(x, y - 94).setColor(team >= 0 ? TEAM_TEXT[team] : '#9dffa8');
     const w = (info?.w ?? 'pistol') as WeaponKey;
-    this.placeGun(this.meGun, m.x, m.y, this.aim, w, show);
+    this.placeGun(this.meGun, x, y, this.aim, w, show);
     if (show) {
-      this.drawAim(m.x, m.y, this.aim, 0x9dffa8, WEAPONS[w].len);
-      this.hpBar(m.x, m.y, info?.hp ?? 100, team);
-      if (this.thrust && now - this.lastJetFx > 55) { this.jetFx(m.x, m.y, this.facing); this.lastJetFx = now; }
+      this.drawAim(x, y, this.aim, 0x9dffa8, WEAPONS[w].len);
+      this.hpBar(x, y, info?.hp ?? 100, team);
+      if (this.thrust && now - this.lastJetFx > 55) { this.jetFx(x, y, this.facing); this.lastJetFx = now; }
     }
   }
 
