@@ -130,18 +130,25 @@ function enter(room: Room, waitForPlayers = false) {
   $<HTMLButtonElement>('leave').onclick = () => { leftOnPurpose = true; void room.leave(); };
 
   room.onLeave(async (code: number) => {
+    const wasInMatch = document.body.classList.contains('ingame');
     roomLeft = true;
     loadId++;
     document.body.classList.remove('chat-open');
     $('chatToggle').setAttribute('aria-expanded', 'false');
     $('chatToggle').setAttribute('aria-label', 'Open chat');
     $('voiceStatus').setAttribute('hidden', '');
-    $('matchLoading').classList.remove('active');
     stopGame();
-    if (leftOnPurpose || code === 1000) { showLobby(); return; }
-    if (code === 4002) { showLobby('Disconnected: too many messages sent.'); return; }
+    if (leftOnPurpose || (code === 1000 && !wasInMatch)) { $('matchLoading').classList.remove('active'); showLobby(); return; }
+    if (code === 4002) { $('matchLoading').classList.remove('active'); showLobby('Disconnected: too many messages sent.'); return; }
+    if (wasInMatch) {
+      $('matchLoadingTitle').textContent = 'Reconnecting to match...';
+      $('matchMessage').textContent = 'Your connection dropped. Restoring your match...';
+      $('matchFill').style.width = '100%';
+      $('matchPct').textContent = '';
+      $('matchLoading').classList.add('active');
+    }
     // unexpected disconnect: try to get back into the same room
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 40; i++) {
       try {
         const back = await client.reconnect(token);
         enter(back, waitForPlayers);
@@ -150,6 +157,7 @@ function enter(room: Room, waitForPlayers = false) {
         await sleep(1500);
       }
     }
+    $('matchLoading').classList.remove('active');
     showLobby('Lost connection to the server.');
   });
 
@@ -201,6 +209,7 @@ function enter(room: Room, waitForPlayers = false) {
     net.onWelcome = () => {
       renderWaiting();
       if (net.started) void startMatch();
+      else $('matchLoading').classList.remove('active');
     };
     net.onLobby = () => renderWaiting();
     net.onStart = () => { void startMatch(); };

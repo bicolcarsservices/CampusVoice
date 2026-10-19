@@ -14,7 +14,7 @@ app.get('/health', (_req, res) => { res.json({ ok: true }); });
 
 const httpServer = createServer(app);
 const gameServer = new Server({
-  transport: new WebSocketTransport({ server: httpServer, pingInterval: 5000, pingMaxRetries: 3 }),
+  transport: new WebSocketTransport({ server: httpServer, pingInterval: 15000, pingMaxRetries: 4 }),
 });
 
 // "code" separates public quick-play rooms ("PUBLIC") from private rooms (random room code)
