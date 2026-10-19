@@ -14,7 +14,10 @@ interface View {
   sprite: Phaser.GameObjects.Sprite; gun: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text;
   buf: Sample[]; lastX: number; lastY: number; lastHp: number; hurtUntil: number; wasDead: boolean; lastJet: number; facing: number;
 }
-interface VBullet { img: Phaser.GameObjects.Image; vx: number; vy: number; ttl: number; rocket: boolean }
+interface VBullet {
+  img: Phaser.GameObjects.Image; vx: number; vy: number; ttl: number; rocket: boolean;
+  weapon: WeaponKey; predicted: boolean; createdAt: number; originX: number; originY: number;
+}
 interface ItemObj { type: string; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; spark: Phaser.GameObjects.Image; tx: number; ty: number }
 interface EndInfo { n: number; rounds: number; series: boolean; champion: string; winnerName: string; scores: { name: string; k: number; d: number; w: number; t: number }[]; tw: number[]; next: number }
 
@@ -57,6 +60,8 @@ export class GameScene extends Phaser.Scene {
   private usingMouse = true;
   private mouseOnUi = false;
   private lastJetFx = 0;
+  private nextPredictedShotId = -1;
+  private predictedNextShotAt = 0;
 
   private meSprite!: Phaser.GameObjects.Sprite;
   private meGun!: Phaser.GameObjects.Image;
@@ -117,6 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.map = null; this.solids = []; this.world = null;
     this.me = null; this.meInfo = null; this.prevInfo = null; this.meDead = false; this.meHurtUntil = 0; this.turbo = false;
     this.seq = 0; this.acc = 0; this.lastSend = 0; this.pending = []; this.outbox = [];
+    this.nextPredictedShotId = -1; this.predictedNextShotAt = 0;
     this.aim = 0; this.facing = 1; this.thrust = false; this.dx = 0; this.firing = false;
     this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1; this.mouseOnUi = false; this.lastJetFx = 0;
     this.views = new Map(); this.items = new Map(); this.bombObjs = new Map(); this.bullets = new Map();
@@ -382,12 +388,34 @@ export class GameScene extends Phaser.Scene {
     switch (e.type) {
       case 'shot': {
         const rocket = e.w === 'rpg';
-        const img = this.add.image(e.x, e.y, rocket ? 'rocket' : 'bullet').setDepth(9).setRotation(Math.atan2(e.vy, e.vx));
-        this.bullets.set(e.id, { img, vx: e.vx, vy: e.vy, ttl: e.ttl, rocket });
+        const predicted = e.o === this.myId
+          ? [...this.bullets.entries()]
+            .filter(([, bullet]) => bullet.predicted && bullet.weapon === e.w)
+            .sort((a, b) => a[1].createdAt - b[1].createdAt)[0]
+          : undefined;
+        let img: Phaser.GameObjects.Image;
+        let elapsed = 0;
+        if (predicted) {
+          const [localId, bullet] = predicted;
+          this.bullets.delete(localId);
+          img = bullet.img;
+          elapsed = Math.max(0, (performance.now() - bullet.createdAt) / 1000);
+          img.setPosition(bullet.originX + e.vx * elapsed, bullet.originY + e.vy * elapsed);
+          img.setVisible(true);
+        } else {
+          img = this.add.image(e.x, e.y, rocket ? 'rocket' : 'bullet').setDepth(9);
+        }
+        img.setTexture(rocket ? 'rocket' : 'bullet').setRotation(Math.atan2(e.vy, e.vx));
+        const ttl = e.ttl - elapsed;
+        if (ttl <= 0) img.destroy();
+        else this.bullets.set(e.id, {
+          img, vx: e.vx, vy: e.vy, ttl, rocket, weapon: e.w,
+          predicted: false, createdAt: performance.now(), originX: e.x, originY: e.y,
+        });
         const a = Math.atan2(e.vy, e.vx);
         this.flash(e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, 0xffe27a, 9, 90);
         const def = isWeapon(e.w) ? WEAPONS[e.w] : null;
-        if (def) {
+        if (def && !predicted) {
           const sfx = def.cls === 'heavy' ? 'rocket' : def.cls === 'melee' ? 'knife' : def.cls;
           audio.play(sfx as audio.Sfx, this.volumeAt(e.x, e.y));
           if (def.kind === 'gun' && this.distToMe(e.x, e.y) < 900) {          // an empty shell pops out
@@ -645,6 +673,7 @@ export class GameScene extends Phaser.Scene {
           seq: ++this.seq, dx: this.dx, thrust: this.thrust, aim: this.aim, fire: this.firing,
           bomb: this.bombQ, reload: this.reloadQ, pick: this.pickQ, sel: this.selQ,
         };
+        if (cmd.fire) this.predictShot();
         this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1;     // one-shot actions
         stepBody(this.me, cmd.dx, cmd.thrust, this.turbo, this.solids);                    // predict movement immediately
         this.pending.push(cmd);
@@ -653,21 +682,57 @@ export class GameScene extends Phaser.Scene {
       if (this.pending.length > 180) this.pending.splice(0, this.pending.length - 180);
     }
     const now = performance.now();
-    if (this.outbox.length && (this.outbox.length >= 2 || now - this.lastSend > 33)) {
+    if (this.outbox.length && (this.outbox.length >= 2 || now - this.lastSend > 16)) {
       this.net.sendInputs(this.outbox.splice(0, 10));
       this.lastSend = now;
     }
   }
 
+  private predictShot() {
+    const info = this.meInfo;
+    const body = this.me;
+    if (!info || !body || this.meDead) return;
+    const weapon = WEAPONS[info.w];
+    const now = performance.now();
+    if (weapon.kind === 'melee' || info.rl || now < this.predictedNextShotAt) return;
+    if (info.am <= 0) return;
+    this.predictedNextShotAt = now + weapon.rate;
+
+    const angle = this.aim + (Math.random() - 0.5) * 2 * weapon.spread;
+    const originX = body.x + Math.cos(this.aim) * 10;
+    const originY = body.y - 30 + Math.sin(this.aim) * 10;
+    const rocket = weapon.kind === 'rocket';
+    const img = this.add.image(originX, originY, rocket ? 'rocket' : 'bullet')
+      .setDepth(9).setRotation(angle);
+    const id = this.nextPredictedShotId--;
+    this.bullets.set(id, {
+      img, vx: Math.cos(angle) * weapon.speed, vy: Math.sin(angle) * weapon.speed,
+      ttl: weapon.life, rocket, weapon: info.w, predicted: true,
+      createdAt: now, originX, originY,
+    });
+    this.flash(originX + Math.cos(angle) * 26, originY + Math.sin(angle) * 26, 0xffe27a, 9, 90);
+    const sfx = weapon.cls === 'heavy' ? 'rocket' : weapon.cls === 'melee' ? 'knife' : weapon.cls;
+    audio.play(sfx as audio.Sfx, this.volumeAt(originX, originY));
+  }
+
   // Bullets are drawn here from the server's "shot" events; the server decides what they really hit.
   private updateBullets(dt: number) {
+    const now = performance.now();
     for (const [id, b] of this.bullets) {
+      if (b.predicted && now - b.createdAt > 2500) {
+        b.img.destroy();
+        this.bullets.delete(id);
+        continue;
+      }
       const x0 = b.img.x, y0 = b.img.y;
       const x1 = x0 + b.vx * dt, y1 = y0 + b.vy * dt;
       let blocked = false;
       for (const s of this.solids) if (segHit(x0, y0, x1, y1, s) !== null) { blocked = true; break; }
       b.ttl -= dt;
-      if (blocked || b.ttl <= 0) { b.img.destroy(); this.bullets.delete(id); continue; }
+      if (blocked || b.ttl <= 0) {
+        if (b.predicted) { b.img.setVisible(false); continue; }
+        b.img.destroy(); this.bullets.delete(id); continue;
+      }
       b.img.setPosition(x1, y1);
       if (b.rocket && Math.random() < 0.6) this.flash(x1 - Math.cos(b.img.rotation) * 12, y1 - Math.sin(b.img.rotation) * 12, 0xcfd8dc, 5, 400, 1.8);
     }
