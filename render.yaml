@@ -29,8 +29,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-  - type: static
+  - type: web
     name: mini-soldier-arena-client
+    runtime: static
     plan: free
     rootDir: services/mini-soldier-arena/client
     buildCommand: npm ci && npm run build
