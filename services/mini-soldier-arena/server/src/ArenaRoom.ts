@@ -197,6 +197,7 @@ export class ArenaRoom extends Room {
     const [x, y] = this.pickSpawn(p);
     p.body = { x, y, vx: 0, vy: 0, onGround: true };
     p.dead = false; p.queue.length = 0; p.ack = p.lastSeq;
+    p.lastInput = { seq: p.lastSeq, dx: 0, thrust: false, aim: 0, fire: false, bomb: false, reload: false, pick: false, sel: -1 };
     p.hp = MAX_HP; p.slots = this.freshSlots(); p.cur = 0;
     p.bombs = 2; p.bombKind = 'grenade'; p.turboUntil = 0; p.reloadUntil = 0; p.nextShot = 0;
     p.invUntil = now + SPAWN_PROTECTION_MS;

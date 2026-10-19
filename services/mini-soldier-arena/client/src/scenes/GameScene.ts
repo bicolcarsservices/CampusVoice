@@ -381,6 +381,7 @@ export class GameScene extends Phaser.Scene {
     this.prevInfo = prev;
     this.meInfo = p;
     this.turbo = p.tb > 0;
+    this.seq = Math.max(this.seq, p.ack);
 
     if (prev && !p.d) {
       if (p.hp < prev.hp) { this.meHurtUntil = this.time.now + 220; audio.play('hurt'); this.cameras.main.flash(90, 255, 60, 60, true); }
