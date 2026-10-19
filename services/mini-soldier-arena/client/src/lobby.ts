@@ -190,7 +190,7 @@ export function initLobby(client: Client, onJoined: (room: Room, waitForPlayers:
 
   $('quick').onclick = () => run((name) => client.joinOrCreate('arena', {
     code: 'PUBLIC', name, mode: 'teams', maxPlayers: 10, rounds: 7, target: 10, map: 'random',
-  }), true);
+  }), false);
   $('create').onclick = () => run((name) => client.create('arena', {
     code: randomCode(), name,
     mode: $<HTMLSelectElement>('mode').value,

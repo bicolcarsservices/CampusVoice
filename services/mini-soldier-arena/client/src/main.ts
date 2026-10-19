@@ -165,9 +165,12 @@ function enter(room: Room, waitForPlayers = false) {
     if (loading || roomLeft) return;
     loading = true;
     const currentLoad = ++loadId;
-    const title = net.welcome?.code === 'PUBLIC' ? 'Loading Quick Play match...' : 'Loading multiplayer match...';
+    const isQuickPlay = net.welcome?.code === 'PUBLIC';
+    const title = isQuickPlay ? 'Quick Play' : 'Loading multiplayer match...';
     $('matchLoadingTitle').textContent = title;
-    $('matchMessage').textContent = 'Spawning into the match...';
+    $('matchMessage').textContent = isQuickPlay && !net.started
+      ? 'Naghahanap ng mga manlalaro...'
+      : 'Spawning into the match...';
     $('matchLoading').classList.add('active');
     $('matchFill').style.width = '100%';
     $('matchPct').textContent = '100%';
@@ -211,11 +214,24 @@ function enter(room: Room, waitForPlayers = false) {
       if (net.started) void startMatch();
       else $('matchLoading').classList.remove('active');
     };
-    net.onLobby = () => renderWaiting();
+    net.onLobby = (state) => {
+      renderWaiting();
+      if (state.started) void startMatch();
+    };
     net.onStart = () => { void startMatch(); };
     renderWaiting();
     if (net.started) void startMatch();
   } else {
+    const updateQuickPlayStatus = () => {
+      if (net.welcome?.code !== 'PUBLIC') return;
+      $('matchLoadingTitle').textContent = 'Quick Play';
+      $('matchMessage').textContent = net.started
+        ? 'Spawning into the match...'
+        : 'Naghahanap ng mga manlalaro...';
+    };
+    net.onWelcome = updateQuickPlayStatus;
+    net.onStart = updateQuickPlayStatus;
+    updateQuickPlayStatus();
     void startMatch();
   }
 }

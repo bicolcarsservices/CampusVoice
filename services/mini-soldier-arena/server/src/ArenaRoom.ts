@@ -77,8 +77,7 @@ export class ArenaRoom extends Room {
   private isPublic = false;
   private started = false;
   private starting = false;
-  private matchmakingUntil = 0;
-  private elimination = false;
+  private nextStartAttemptAt = 0;
   private teamKills = [0, 0];
   private teamWins = [0, 0];
 
@@ -98,16 +97,16 @@ export class ArenaRoom extends Room {
   onCreate(options: any) {
     this.code = typeof options?.code === 'string' ? options.code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PUBLIC' : 'PUBLIC';
     this.isPublic = this.code === 'PUBLIC';
-    this.elimination = this.isPublic;
     this.mode = this.isPublic || options?.mode === 'teams' ? 'teams' : 'ffa';
     const cap = MAX_PLAYERS[this.mode];
     const wanted = Math.floor(num(options?.maxPlayers, Number(process.env.MAX_PLAYERS) || cap));
     this.maxClients = this.isPublic ? cap : clamp(wanted, MIN_PLAYERS, cap);
-    this.rounds = this.isPublic ? 7 : (ROUND_CHOICES.includes(options?.rounds) ? options.rounds : 3);
+    this.rounds = this.isPublic ? 1 : (ROUND_CHOICES.includes(options?.rounds) ? options.rounds : 3);
     this.target = TARGET_CHOICES.includes(options?.target) ? options.target : 10;
     if (this.isPublic) this.target = 10;
     this.mapChoice = this.isPublic ? 'random' : (typeof options?.map === 'string' && MAP_IDS.includes(options.map) ? options.map : 'random');
     this.map = getMap(this.mapChoice === 'random' ? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)] : this.mapChoice);
+    this.started = this.isPublic;
     this.setMetadata({ code: this.code, maxPlayers: this.maxClients, map: this.map.id, mode: this.mode });
     this.setupPickups();
 
@@ -134,8 +133,7 @@ export class ArenaRoom extends Room {
     const team = this.mode === 'teams' ? (counts[0] <= counts[1] ? 0 : 1) : -1;
     const p = this.makePlayer(client.sessionId, cleanName(options?.name, `Soldier${this.joined}`), team);
     this.players.set(client.sessionId, p);
-    if (this.isPublic && this.players.size === 1) this.matchmakingUntil = Date.now() + 8000;
-    const readyToStart = this.clients.length >= this.maxClients;
+    const readyToStart = !this.isPublic && this.players.size >= this.maxClients;
     setTimeout(() => {
       void (async () => {
         if (!this.clients.some((member) => member.sessionId === client.sessionId)) return;
@@ -168,7 +166,6 @@ export class ArenaRoom extends Room {
     this.lastChatAt.delete(client.sessionId);
     this.sendRoster();
     if (!this.started) this.sendLobby();
-    else if (this.elimination) this.checkRoundEnd(p, Date.now());
   }
 
   onDispose() { console.log(`[room ${this.roomId}] disposed`); }
@@ -261,9 +258,7 @@ export class ArenaRoom extends Room {
   // ---------- simulation ----------
   private update(deltaMs: number) {
     if (!this.started) {
-      const connected = [...this.players.values()].filter((p) => p.connected).length;
-      if (this.isPublic && connected >= MIN_PLAYERS &&
-        (connected >= this.maxClients || Date.now() >= this.matchmakingUntil)) void this.startMatch();
+      if (!this.isPublic && this.players.size >= this.maxClients && Date.now() >= this.nextStartAttemptAt) void this.startMatch();
       if (!this.started) return;
     }
     this.acc = Math.min(this.acc + deltaMs, 250);
@@ -283,7 +278,7 @@ export class ArenaRoom extends Room {
     for (const p of this.players.values()) {
       if (p.dead) {
         p.queue.length = 0; p.ack = p.lastSeq;
-        if (!this.elimination && now >= p.respawnAt) this.respawn(p, now);
+        if (now >= p.respawnAt) this.respawn(p, now);
         continue;
       }
       const steps = p.queue.length > 4 ? 2 : 1;
@@ -319,17 +314,7 @@ export class ArenaRoom extends Room {
 
   // ---------- rounds ----------
   private checkRoundEnd(killer: Player, now: number) {
-    if (this.phase !== 'play') return;
-    if (this.elimination) {
-      const alive = [0, 0];
-      this.players.forEach((p) => {
-        if (p.team < 0) return;
-        if (!p.dead) alive[p.team]++;
-      });
-      if (alive[0] === 0 && alive[1] > 0) this.endRound(now, undefined, 1);
-      else if (alive[1] === 0 && alive[0] > 0) this.endRound(now, undefined, 0);
-      return;
-    }
+    if (this.isPublic || this.phase !== 'play') return;
     if (this.mode === 'ffa' && killer.kills >= this.target) this.endRound(now, killer, -1);
     else if (this.mode === 'teams' && this.teamKills[killer.team] >= this.target) this.endRound(now, undefined, killer.team);
   }
@@ -517,8 +502,7 @@ export class ArenaRoom extends Room {
     if (counted && killer) { killer.kills++; killer.totalKills++; if (killer.team >= 0) this.teamKills[killer.team]++; }
     if (w !== 'out') this.dropWeapons(victim, now);
     this.broadcast('event', { type: 'kill', k: killer ? killer.id : '', v: victim.id, w, kt: killer ? killer.team : -1, vt: victim.team });
-    if (this.elimination) this.checkRoundEnd(killer ?? victim, now);
-    else if (counted && killer) this.checkRoundEnd(killer, now);
+    if (counted && killer) this.checkRoundEnd(killer, now);
   }
 
   // ---------- items lying on the map ----------
@@ -715,6 +699,7 @@ export class ArenaRoom extends Room {
       await this.lock();
     } catch (error) {
       this.starting = false;
+      this.nextStartAttemptAt = Date.now() + 1000;
       console.error(`[room ${this.roomId}] could not lock before starting`, error);
       return;
     }

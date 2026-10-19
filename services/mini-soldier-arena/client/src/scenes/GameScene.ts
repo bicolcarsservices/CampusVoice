@@ -884,7 +884,7 @@ export class GameScene extends Phaser.Scene {
     const teams = this.net.info.mode === 'teams';
 
     this.roundText.setText(`ROUND ${this.net.info.n} / ${this.net.info.rounds}`);
-    const objective = w?.code === 'PUBLIC' ? 'Eliminate the other team' : `First to ${this.net.info.target} kills`;
+    const objective = w?.code === 'PUBLIC' ? 'Open team arena · join anytime' : `First to ${this.net.info.target} kills`;
     this.mapText.setText(`${this.map?.name ?? ''}   |   ${objective}${w ? `   |   ${w.code === 'PUBLIC' ? 'Public' : 'Room ' + w.code}  ${roster.length}/${w.maxPlayers}` : ''}`);
     this.teamTextB.setVisible(teams).setText(teams && snap ? `${TEAM_NAMES[0]} ${snap.tk[0]}` : '');
     this.teamTextR.setVisible(teams).setText(teams && snap ? `${snap.tk[1]} ${TEAM_NAMES[1]}` : '');

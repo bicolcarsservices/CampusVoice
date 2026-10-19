@@ -55,6 +55,7 @@ export class Net {
     room.onMessage('lobby', (m: LobbyState) => {
       this.lobby = m;
       this.roster = m.players;
+      this.started = m.started;
       this.onLobby?.(m);
     });
     room.onMessage('start', () => {

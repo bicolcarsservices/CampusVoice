@@ -29,10 +29,9 @@ Open the Vite URL printed in the client terminal (use a second window, or an inc
 
 ## How the game works
 
-- Open the game: loading screen, then the lobby. **PLAY** matches you with other players in a public 5v5 team match.
-  Matchmaking starts when 10 players join or after an 8-second queue window once at least 2 players are waiting.
-- Quick Play is an elimination series of 7 rounds. Wipe out the other team to win a round; each new round uses a different random map.
-  After the seventh round, leave the match and press **PLAY** to find a new group.
+- Open the game: loading screen, then the menu. **PLAY** enters an always-open public team arena immediately; there is no matchmaking wait or waiting lobby.
+  Other players can join the same arena at any time (up to 10 players). Players respawn after being eliminated, so the fight continues.
+- Quick Play is a continuous team battle on a random map. Private multiplayer rooms still wait for their selected player count and use the configured rounds.
 - **Multiplayer** creates a private room. Share its code and the match starts after the selected number of players have joined.
   You can also join an existing private room with its code.
 - **Room chat** is available in the waiting lobby and during matches by opening the **Chat** control. It starts collapsed; messages are room-only and limited to 240 characters.
