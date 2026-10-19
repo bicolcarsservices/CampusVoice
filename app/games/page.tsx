@@ -70,19 +70,6 @@ export default async function GamesPage() {
       icon: "✦",
       visual: "striker",
     },
-    {
-      id: "mini-soldier-arena",
-      title: "Mini Soldier Arena",
-      tagline: "Gear up. Team up. Battle.",
-      category: "MULTIPLAYER · 2D SHOOTER",
-      description: "Jetpack into real-time arena battles, play solo or in teams, and challenge friends in private rooms. Free to play.",
-      href: "/games/mini-soldier-arena",
-      cta: "Play free",
-      registerHref: undefined,
-      logoKey: "",
-      icon: "⚔",
-      visual: "soldier-arena",
-    },
   ];
 
   return (
@@ -132,14 +119,6 @@ export default async function GamesPage() {
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="game-arcade-promo"
                   />
-                ) : game.visual === "soldier-arena" ? (
-                  <Image
-                    src="/mini-soldier-arena-promo.png"
-                    alt=""
-                    fill
-                    sizes="(max-width: 768px) 100vw, 25vw"
-                    className="game-arcade-promo"
-                  />
                 ) : (
                   <div className="doodle-art" aria-hidden="true">
                     <svg viewBox="0 0 180 120">
@@ -153,8 +132,6 @@ export default async function GamesPage() {
                 <div className="game-arcade-logo">
                   {gameLogos.get(game.logoKey)
                     ? <img src={gameLogos.get(game.logoKey)} alt={`${game.title} logo`} />
-                    : game.visual === "soldier-arena"
-                      ? <img src="/mini-soldier-arena-logo.png" alt={`${game.title} logo`} />
                     : <span aria-hidden="true">{game.icon}</span>}
                 </div>
                 <span className="game-arcade-play-mark" aria-hidden="true">↗</span>

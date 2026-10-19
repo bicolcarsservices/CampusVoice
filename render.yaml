@@ -18,23 +18,3 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-  - type: web
-    name: mini-soldier-arena-server
-    runtime: node
-    plan: free
-    rootDir: services/mini-soldier-arena/server
-    buildCommand: npm ci
-    startCommand: npm start
-    healthCheckPath: /health
-    envVars:
-      - key: NODE_ENV
-        value: production
-  - type: web
-    name: mini-soldier-arena-client
-    runtime: static
-    rootDir: services/mini-soldier-arena/client
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_SERVER_URL
-        value: wss://mini-soldier-arena-server.onrender.com

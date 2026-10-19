@@ -1600,11 +1600,6 @@ html.dark .post-composer-emoji-tool .chat-tool-button:hover { border-color: var(
 .game-arcade-card:hover .game-arcade-promo { transform: scale(1.06); opacity: .76; }
 .game-arcade-art::after { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(11, 18, 32, .72), transparent 58%); content: ""; pointer-events: none; }
 .doodle-art { width: 75%; color: #38bdf8; filter: drop-shadow(0 0 16px rgba(56, 189, 248, .3)); }.doodle-art svg { width: 100%; }
-.game-arcade-card-soldier-arena .game-arcade-art { background: radial-gradient(circle at 50% 45%, #166534, #0b1220 72%); }
-.game-arcade-card-soldier-arena .game-arcade-promo { opacity: .88; }
-.game-arcade-card-soldier-arena:hover .game-arcade-promo { opacity: 1; }
-.game-arcade-card-soldier-arena .game-arcade-logo { width: 5rem; height: 3rem; border-radius: .7rem; }
-.game-arcade-card-soldier-arena .game-arcade-logo img { object-fit: contain; padding: .1rem; }
 .game-arcade-index { position: absolute; z-index: 1; top: .7rem; left: .7rem; color: rgba(255,255,255,.7); font-size: .58rem; font-weight: 850; letter-spacing: .12em; }
 .game-arcade-logo { position: absolute; z-index: 2; right: .7rem; bottom: .7rem; display: grid; width: 3.5rem; height: 3.5rem; place-items: center; overflow: hidden; border: 1px solid rgba(255,255,255,.25); border-radius: 1rem; background: rgba(11, 18, 32, .8); color: #7dd3fc; font-size: 1.4rem; font-weight: 900; backdrop-filter: blur(8px); }
 .game-arcade-logo img { width: 100%; height: 100%; object-fit: contain; padding: .25rem; }
