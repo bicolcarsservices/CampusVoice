@@ -49,6 +49,8 @@ Open the Vite URL printed in the client terminal (use a second window, or an inc
 - **Weapons.** You start with a pistol (unlimited spare bullets). You can carry 3 guns and choose which one to use.
   Only 5 guns, 5 bombs and 5 turbo rockets lie on the map at a time. A taken item comes back after 3 minutes at a different spot.
   A dead player's guns drop on the ground for 1 minute.
+- **First aid kits.** Up to 5 kits appear on the map. Each restores up to 50 HP (and is not consumed at full health); a collected kit respawns
+  after 3 minutes at a different spot.
 - Going outside the arena triggers a warning and drains health gradually until you return. Spawn protection lasts 2 seconds.
 
 ## Controls

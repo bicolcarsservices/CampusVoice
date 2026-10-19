@@ -2,7 +2,7 @@
 
 export type WeaponKey = 'pistol' | 'tt33' | 'browning' | 'revolver' | 'uzi' | 'tommy' | 'm16' | 'ak47' | 'ar' | 'svd' | 'kar98' | 'rpg' | 'knife';
 export type BombKind = 'grenade' | 'pineapple';
-export type PickupType = WeaponKey | BombKind | 'turbo';
+export type PickupType = WeaponKey | BombKind | 'turbo' | 'medkit';
 export type WeaponClass = 'pistol' | 'smg' | 'rifle' | 'sniper' | 'heavy' | 'melee';
 
 export interface WeaponDef {
@@ -49,11 +49,11 @@ export const BOMBS: Record<BombKind, { name: string; fuse: number; radius: numbe
 export const isWeapon = (t: string): t is WeaponKey => t in WEAPONS;
 
 // ---- what lies on the map ----
-export type PickupCat = 'gun' | 'bomb' | 'turbo';
-export const catOf = (t: PickupType): PickupCat => (isWeapon(t) ? 'gun' : t === 'turbo' ? 'turbo' : 'bomb');
+export type PickupCat = 'gun' | 'bomb' | 'turbo' | 'medkit';
+export const catOf = (t: PickupType): PickupCat => (isWeapon(t) ? 'gun' : t === 'turbo' || t === 'medkit' ? t : 'bomb');
 
 export const MAX_SLOTS = 3;                                      // weapons you can carry (the pistol is slot 1)
-export const PICKUP_COUNTS: Record<PickupCat, number> = { gun: 5, bomb: 5, turbo: 5 };   // how many lie on the map at once
+export const PICKUP_COUNTS: Record<PickupCat, number> = { gun: 5, bomb: 5, turbo: 5, medkit: 5 };   // how many lie on the map at once
 export const PICKUP_RESPAWN_MS = 3 * 60 * 1000;                  // a taken item comes back after 3 minutes, somewhere else
 export const DROP_LIFETIME_MS = 60 * 1000;                       // a gun dropped by a dead player stays this long
 

@@ -65,6 +65,10 @@ export function makeTextures(scene: Phaser.Scene) {
   g.fillStyle(0xd23a3a); g.fillTriangle(44, 8, 36, 2, 36, 14);
   g.fillStyle(0xffb300); g.fillTriangle(0, 8, 8, 3, 8, 13);
   tex('icon_turbo_flat', 46, 16);
+  g.fillStyle(0x174a34); g.fillRoundedRect(2, 2, 36, 28, 5);
+  g.lineStyle(2, 0xffffff); g.strokeRoundedRect(2, 2, 36, 28, 5);
+  g.fillStyle(0xffffff); g.fillRoundedRect(16, 7, 8, 18, 2); g.fillRoundedRect(11, 12, 18, 8, 2);
+  tex('medkit', 40, 32);
   g.fillStyle(0xffffff); g.fillRect(4, 0, 2, 10); g.fillRect(0, 4, 10, 2); g.fillStyle(0xfff3a0); g.fillRect(3, 3, 4, 4);
   tex('twinkle', 10, 10);
 

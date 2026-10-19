@@ -22,6 +22,7 @@ const ROUND_END_MS = 8000;
 const SERIES_END_MS = 12000;
 const JOIN_MESSAGE_DELAY_MS = 150;
 const MAX_HP = 100;
+const MEDKIT_HEAL = 50;
 const TURBO_MS = 6000;
 const MAX_BOMBS = 5;
 const PICKUP_RADIUS = 38;
@@ -539,6 +540,7 @@ export class ArenaRoom extends Room {
 
   private randomType(cat: PickupCat): PickupType {
     if (cat === 'turbo') return 'turbo';
+    if (cat === 'medkit') return 'medkit';
     if (cat === 'bomb') return Math.random() < 0.5 ? 'grenade' : 'pineapple';
     const total = GUN_WEIGHTS.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;
@@ -607,6 +609,9 @@ export class ArenaRoom extends Room {
         p.slots[idx] = { k: t, ammo: pk.ammo ?? def.mag, reserve: pk.reserve ?? def.reserve };
         p.cur = idx; p.reloadUntil = 0; p.nextShot = now + 250;
       } else return false;
+    } else if (t === 'medkit') {
+      if (p.hp >= MAX_HP) return false;
+      p.hp = Math.min(MAX_HP, p.hp + MEDKIT_HEAL);
     } else if (t === 'turbo') p.turboUntil = now + TURBO_MS;
     else { p.bombs = Math.min(MAX_BOMBS, p.bombs + 2); p.bombKind = t; }
 

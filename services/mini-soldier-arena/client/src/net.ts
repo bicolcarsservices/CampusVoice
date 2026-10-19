@@ -1,6 +1,6 @@
 import type { Room } from 'colyseus.js';
 import type { InputCmd } from './shared/sim';
-import type { WeaponKey, BombKind } from './shared/weapons';
+import type { WeaponKey, BombKind, PickupType } from './shared/weapons';
 import type { Mode } from './shared/rules';
 
 export interface Welcome {
@@ -15,7 +15,7 @@ export interface SnapPlayer {
   hp: number; w: WeaponKey; am: number; rs: number; bm: number; bk: BombKind; tb: number; k: number; de: number; iv: boolean; rl: boolean;
   tm: number; wn: number; cu: number; ws: [WeaponKey, number, number][];
 }
-export type PickupRow = [number, string, number, number];          // id, type, x, y (the ground under it)
+export type PickupRow = [number, PickupType, number, number];       // id, type, x, y (the ground under it)
 export type BombRow = [number, number, number, BombKind];          // id, x, y, kind
 export interface Snap { t: number; ph: Phase; rn: number; tk: [number, number]; tw: [number, number]; p: SnapPlayer[]; pk: PickupRow[]; bm: BombRow[] }
 export interface GameEvent { type: string; [key: string]: any }

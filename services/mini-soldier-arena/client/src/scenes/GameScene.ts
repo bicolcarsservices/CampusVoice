@@ -116,6 +116,7 @@ export class GameScene extends Phaser.Scene {
   private endUntil = 0;
   private bannerUntil = 0;
   private lastSnap: Snap | null = null;
+  private arenaReady = false;
 
   constructor() { super('GameScene'); }
 
@@ -133,6 +134,7 @@ export class GameScene extends Phaser.Scene {
     this.layoutEditing = false; this.dragControl = null; this.dragPointer = null; this.keyBindings.clear();
     this.slotIcons = []; this.slotTexts = []; this.touchLabels.clear(); this.feed = []; this.deathMsg = '';
     this.endInfo = null; this.endUntil = 0; this.bannerUntil = 0; this.lastSnap = null;
+    this.arenaReady = false;
   }
 
   create() {
@@ -282,6 +284,16 @@ export class GameScene extends Phaser.Scene {
     this.mapText.setText(map.name);
     if (this.net.latest) this.handleSnap(this.net.latest);
     this.net.pendingEvents.splice(0).forEach((e) => this.handleEvent(e));
+    this.signalArenaReady();
+  }
+
+  private signalArenaReady() {
+    if (this.arenaReady || !this.me) return;
+    const onArenaReady = this.registry.get('onArenaReady');
+    if (typeof onArenaReady === 'function') {
+      this.arenaReady = true;
+      onArenaReady();
+    }
   }
 
   private buildHud() {
@@ -494,6 +506,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.syncItems(s);
     this.syncBombs(s);
+    this.signalArenaReady();
   }
 
   private reconcile(p: SnapPlayer) {
@@ -507,7 +520,7 @@ export class GameScene extends Phaser.Scene {
 
     if (prev && !p.d) {
       if (p.hp < prev.hp) { this.meHurtUntil = this.time.now + 220; audio.play('hurt'); this.cameras.main.flash(90, 255, 60, 60, true); }
-      if (p.ws.length > prev.ws.length || p.bm > prev.bm || (p.tb > 0 && prev.tb <= 0) || (p.ws.length === prev.ws.length && p.w !== prev.w && p.cu === prev.cu)) audio.play('pickup');
+      if (p.hp > prev.hp || p.ws.length > prev.ws.length || p.bm > prev.bm || (p.tb > 0 && prev.tb <= 0) || (p.ws.length === prev.ws.length && p.w !== prev.w && p.cu === prev.cu)) audio.play('pickup');
       if (p.cu !== prev.cu && p.ws.length === prev.ws.length) audio.play('swap');
       if (p.rl && !prev.rl) audio.play('reload');
     }
@@ -537,11 +550,13 @@ export class GameScene extends Phaser.Scene {
   // ---------- things lying on the ground ----------
   private itemVisual(type: string): { key: string; scale: number } {
     if (isWeapon(type)) return { key: 'w_' + type, scale: 0.5 * Math.max(1, 38 / WEAPONS[type].len) };
+    if (type === 'medkit') return { key: 'medkit', scale: 0.9 };
     if (type === 'turbo') return { key: 'icon_turbo_flat', scale: 1 };
     return { key: 'w_' + type, scale: 0.8 };
   }
   private itemName(type: string): string {
     if (isWeapon(type)) return WEAPONS[type].name;
+    if (type === 'medkit') return 'FIRST AID KIT +50 HP';
     if (type === 'turbo') return 'TURBO ROCKET';
     return type in BOMBS ? BOMBS[type as 'grenade'].name : type;
   }

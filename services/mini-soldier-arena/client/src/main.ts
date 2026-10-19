@@ -159,19 +159,13 @@ function enter(room: Room, waitForPlayers = false) {
     const currentLoad = ++loadId;
     const title = net.welcome?.code === 'PUBLIC' ? 'Loading Quick Play match...' : 'Loading multiplayer match...';
     $('matchLoadingTitle').textContent = title;
-    $('matchMessage').textContent = 'Preparing the arena';
+    $('matchMessage').textContent = 'Spawning into the match...';
     $('matchLoading').classList.add('active');
-    const fill = $('matchFill'), pct = $('matchPct');
-    const files = ['assets/soldier.png', 'assets/head.png', ...[...Object.keys(WEAPONS), 'grenade', 'pineapple'].map((k) => `assets/weapons/${k}.png`)];
+    $('matchFill').style.width = '100%';
+    $('matchPct').textContent = '100%';
     try {
-      await runLoading(files, (p) => {
-        const value = Math.round(p * 100);
-        fill.style.width = `${value}%`;
-        pct.textContent = `${value}%`;
-      });
       if (currentLoad !== loadId || roomLeft) return;
       hideLobby();
-      $('matchLoading').classList.remove('active');
       updateFsHint();
       game = new Phaser.Game({
         type: Phaser.AUTO,
@@ -182,7 +176,14 @@ function enter(room: Room, waitForPlayers = false) {
         scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
         input: { activePointers: 3 },
         scene: [BootScene, GameScene],
-        callbacks: { preBoot: (g) => { g.registry.set('net', net); } },
+        callbacks: {
+          preBoot: (g) => {
+            g.registry.set('net', net);
+            g.registry.set('onArenaReady', () => {
+              if (currentLoad === loadId && !roomLeft) $('matchLoading').classList.remove('active');
+            });
+          },
+        },
       });
     } catch (error) {
       $('matchLoading').classList.remove('active');
