@@ -56,14 +56,14 @@ Open the Vite URL printed in the client terminal (use a second window, or an inc
 | | Desktop | Phone (landscape) |
 |---|---|---|
 | Move / fly | A D, W or Space | left joystick (push up to fly) or JET button |
-| Aim and fire | mouse, hold the left button, or F | hold FIRE and drag to aim |
+| Aim and fire | mouse, hold the left button, or F | drag the right aim joystick; holding it also fires |
 | Choose gun | 1 2 3, Q, mouse wheel | tap the weapon boxes at the bottom |
 | Pick up / swap (bag full) | E | round E button |
 | Bomb / reload | G / R | round buttons |
 | Sound | M or the Sound button | Sound button |
 | Chat / voice | Chat and Mic controls beside the game | Chat button in the lobby; Mic is available in team matches |
 
-Open **Settings** during a match to change touch control size and opacity, rebind keyboard actions, or arrange touch controls by dragging them. The joystick, FIRE, JET, bomb, reload, pickup, and weapon slots can be repositioned. Settings are saved in the current browser on the current device; use **Reset defaults** to restore them.
+Open **Settings** during a match to change touch control size and opacity, rebind keyboard actions, or arrange touch controls by dragging them. The move and aim joysticks, JET, bomb, reload, pickup, and weapon slots can be repositioned. Drag the right aim joystick to aim in any direction; keeping it pushed also fires. Settings are saved in the current browser on the current device; use **Reset defaults** to restore them.
 
 On touch devices, the game requests fullscreen and landscape orientation when supported. If the browser or device does not allow orientation locking, the game stays covered by a rotate-your-phone prompt while in portrait; the page itself does not scroll.
 

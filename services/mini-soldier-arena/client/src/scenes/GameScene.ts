@@ -73,6 +73,8 @@ export class GameScene extends Phaser.Scene {
   private flyPtr: Phaser.Input.Pointer | null = null;
   private joyBase = { x: 0, y: 0 };
   private joyVec = { x: 0, y: 0 };
+  private aimVec = { x: 0, y: 0 };
+  private aimStickActive = false;
   private layoutEditing = false;
   private dragControl: ControlId | null = null;
   private dragPointer: Phaser.Input.Pointer | null = null;
@@ -119,6 +121,7 @@ export class GameScene extends Phaser.Scene {
     this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1; this.mouseOnUi = false; this.lastJetFx = 0;
     this.views = new Map(); this.items = new Map(); this.bombObjs = new Map(); this.bullets = new Map();
     this.joyPtr = null; this.aimPtr = null; this.flyPtr = null; this.joyVec = { x: 0, y: 0 };
+    this.aimVec = { x: 0, y: 0 }; this.aimStickActive = false;
     this.layoutEditing = false; this.dragControl = null; this.dragPointer = null; this.keyBindings.clear();
     this.slotIcons = []; this.slotTexts = []; this.touchLabels.clear(); this.feed = []; this.deathMsg = '';
     this.endInfo = null; this.endUntil = 0; this.bannerUntil = 0; this.lastSnap = null;
@@ -149,7 +152,7 @@ export class GameScene extends Phaser.Scene {
 
     const onControl = (p: Phaser.Input.Pointer, id: ControlId) => {
       const center = controlCenter(id);
-      const radius = (id === 'joystick' ? 70 : id.startsWith('slot') ? 38 : 34) * getControlSettings().size;
+      const radius = (id === 'joystick' || id === 'attack' ? JOY_R : id.startsWith('slot') ? 38 : 34) * getControlSettings().size;
       return Phaser.Math.Distance.Between(p.x, p.y, center.x, center.y) < radius + 14;
     };
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (!p.wasTouch) this.usingMouse = true; });
@@ -174,11 +177,19 @@ export class GameScene extends Phaser.Scene {
       if (p.wasTouch && onControl(p, 'joystick') && !this.joyPtr) {
         this.joyPtr = p; this.joyBase = controlCenter('joystick');
       } else if (p.wasTouch && onControl(p, 'fly') && !this.flyPtr) this.flyPtr = p;
-      else if (p.wasTouch && onControl(p, 'attack') && !this.aimPtr) this.aimPtr = p;
+      else if (p.wasTouch && onControl(p, 'attack') && !this.aimPtr) {
+        this.aimPtr = p;
+        this.aimVec = { x: 0, y: 0 };
+        this.aimStickActive = false;
+      }
     });
     const release = (p: Phaser.Input.Pointer) => {
       if (p === this.joyPtr) this.joyPtr = null;
-      if (p === this.aimPtr) this.aimPtr = null;
+      if (p === this.aimPtr) {
+        this.aimPtr = null;
+        this.aimVec = { x: 0, y: 0 };
+        this.aimStickActive = false;
+      }
       if (p === this.flyPtr) this.flyPtr = null;
       if (p === this.dragPointer) {
         saveControlSettings();
@@ -208,6 +219,8 @@ export class GameScene extends Phaser.Scene {
     this.joyPtr = null;
     this.aimPtr = null;
     this.flyPtr = null;
+    this.aimVec = { x: 0, y: 0 };
+    this.aimStickActive = false;
   }
 
   private refreshKeyBindings() {
@@ -285,7 +298,7 @@ export class GameScene extends Phaser.Scene {
     for (const id of CONTROL_IDS) {
       if (id === 'bomb') continue;
       const label = st(0, 0, { ...TEXT, fontSize: '15px', strokeThickness: 3 }, 0.5, 0.5);
-      label.setText(CONTROL_LABELS[id]);
+      label.setText(id === 'attack' ? 'AIM + FIRE' : CONTROL_LABELS[id]);
       this.touchLabels.set(id, label);
     }
     this.bombIcon = this.add.image(0, 0, 'w_grenade').setScrollFactor(0).setDepth(102);
@@ -572,6 +585,7 @@ export class GameScene extends Phaser.Scene {
     let dx = Number(this.cursors.right.isDown || this.isActionDown('right')) - Number(this.cursors.left.isDown || this.isActionDown('left'));
     let thrust = this.cursors.up.isDown || this.isActionDown('fly') || this.isActionDown('flyAlt') || !!this.flyPtr?.isDown;
     let joyAngle: number | null = null;
+    let aimStickAngle: number | null = null;
     if (this.joyPtr) {
       const p = this.joyPtr;
       const radius = JOY_R * getControlSettings().size;
@@ -584,11 +598,25 @@ export class GameScene extends Phaser.Scene {
       if (vy < -0.35) thrust = true;
       if (len > 0.35) joyAngle = Math.atan2(vy, vx);      // the soldier turns toward where you steer
     } else this.joyVec = { x: 0, y: 0 };
+    if (this.aimPtr) {
+      const base = controlCenter('attack');
+      const radius = JOY_R * getControlSettings().size;
+      let vx = (this.aimPtr.x - base.x) / radius;
+      let vy = (this.aimPtr.y - base.y) / radius;
+      const len = Math.hypot(vx, vy);
+      if (len > 1) { vx /= len; vy /= len; }
+      this.aimVec = { x: vx, y: vy };
+      this.aimStickActive = len > 0.18;
+      if (this.aimStickActive) aimStickAngle = Math.atan2(vy, vx);
+    } else {
+      this.aimVec = { x: 0, y: 0 };
+      this.aimStickActive = false;
+    }
     this.dx = dx;
     this.thrust = thrust;
 
     const mouse = this.input.mousePointer;
-    this.firing = !!this.aimPtr?.isDown || this.isActionDown('fire') || (this.usingMouse && mouse.leftButtonDown() && !this.mouseOnUi);
+    this.firing = this.aimStickActive || this.isActionDown('fire') || (this.usingMouse && mouse.leftButtonDown() && !this.mouseOnUi);
     if (this.actionJustDown('bomb')) this.bombQ = true;
     if (this.actionJustDown('reload')) this.reloadQ = true;
     if (this.actionJustDown('pickup')) this.pickQ = true;
@@ -598,8 +626,9 @@ export class GameScene extends Phaser.Scene {
 
     if (!this.me) return;
     const cam = this.cameras.main;
-    const ptr = this.aimPtr?.isDown ? this.aimPtr : (this.usingMouse ? mouse : null);
-    if (ptr) {
+    const ptr = this.usingMouse ? mouse : null;
+    if (aimStickAngle !== null) this.aim = aimStickAngle;
+    else if (ptr) {
       ptr.updateWorldPoint(cam);
       this.aim = Math.atan2(ptr.worldY - (this.me.y - 30), ptr.worldX - this.me.x);
     } else if (joyAngle !== null) this.aim = joyAngle;
@@ -796,10 +825,17 @@ export class GameScene extends Phaser.Scene {
       if (id === 'joystick' || id.startsWith('slot')) continue;
       const center = controlCenter(id);
       const buttonRadius = 34 * settings.size;
-      h.fillStyle(0x1b2733, touchAlpha * 0.78).fillCircle(center.x, center.y, buttonRadius);
-      h.lineStyle(this.layoutEditing && id === this.dragControl ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.65).strokeCircle(center.x, center.y, buttonRadius);
+      if (id === 'attack') {
+        const attackRadius = radius;
+        h.fillStyle(0xffffff, touchAlpha * 0.12).fillCircle(center.x, center.y, attackRadius);
+        h.lineStyle(this.layoutEditing && id === this.dragControl ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.55).strokeCircle(center.x, center.y, attackRadius);
+        h.fillStyle(0xffffff, touchAlpha * 0.55).fillCircle(center.x + this.aimVec.x * attackRadius, center.y + this.aimVec.y * attackRadius, 28 * settings.size);
+      } else {
+        h.fillStyle(0x1b2733, touchAlpha * 0.78).fillCircle(center.x, center.y, buttonRadius);
+        h.lineStyle(this.layoutEditing && id === this.dragControl ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.65).strokeCircle(center.x, center.y, buttonRadius);
+      }
       const label = this.touchLabels.get(id);
-      label?.setPosition(center.x, center.y).setAlpha(touchAlpha).setScale(settings.size);
+      label?.setPosition(center.x, id === 'attack' ? center.y + radius + 13 : center.y).setAlpha(touchAlpha).setScale(settings.size);
     }
     if (this.layoutEditing) {
       for (const id of CONTROL_IDS) {
