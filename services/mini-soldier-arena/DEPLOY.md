@@ -10,7 +10,7 @@ Mini Soldier Arena is the fourth game in the CampusVoice games catalog. It consi
 4. Confirm that `https://mini-soldier-arena-server.onrender.com/health` returns `{"ok":true}`.
 5. Set `MINI_SOLDIER_ARENA_URL` in the CampusVoice web app's hosting environment to the client URL, normally `https://mini-soldier-arena-client.onrender.com`, and redeploy CampusVoice.
 
-If Render assigns a different client hostname, use that hostname for `MINI_SOLDIER_ARENA_URL`. The game server URL is passed to the Vite client through the Blueprint's `VITE_SERVER_HOST` service reference.
+If the Arena server's public hostname changes, update the `VITE_SERVER_URL` value for `mini-soldier-arena-client` in `render.yaml` to its secure `wss://` address, then sync and redeploy the Blueprint.
 
 The initial Blueprint sync may ask for existing Campus Doodle secrets. Keep their configured values. Mini Soldier Arena requires no additional secrets.
 
