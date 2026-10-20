@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "game:doodle": "node services/campus-doodle/dev.js",
-    "game:doodle:test": "npm --prefix services/campus-doodle test"
+    "game:doodle:test": "npm --prefix services/campus-doodle test",
+    "game:mini-soldier-arena:client": "npm --prefix services/mini-soldier-arena/client run dev",
+    "game:mini-soldier-arena:server": "npm --prefix services/mini-soldier-arena/server run dev"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

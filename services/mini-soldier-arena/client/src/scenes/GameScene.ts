@@ -1,23 +1,22 @@
 import Phaser from 'phaser';
-import { Body, InputCmd, FIXED_DT, SPEED, Rect, stepBody, outOfBounds, segHit } from '../shared/sim';
+import { Body, InputCmd, FIXED_DT, SPEED, Rect, stepBody, segHit } from '../shared/sim';
 import { MapDef, getMap } from '../shared/maps';
 import { WEAPONS, BOMBS, WeaponKey, MAX_SLOTS, isWeapon } from '../shared/weapons';
 import { TEAM_COLORS, TEAM_TEXT, TEAM_NAMES } from '../shared/rules';
 import { GAME_W as W, GAME_H as H, CELL_H, FEET, JOY_R, INTERP_DELAY_MS } from '../config';
 import { buildWorld, updateBackdrop, World } from '../world';
 import { Net, Snap, SnapPlayer, GameEvent } from '../net';
-import { ActionId, ControlId, CONTROL_IDS, CONTROL_LABELS, getControlPosition, getControlSettings, saveControlSettings, updateControlPosition } from '../controls';
 import * as audio from '../audio';
+import { isTouchDevice } from '../device';
+import { loadControlLayout } from '../controls';
+import type { ControlLayout } from '../controls';
 
 interface Sample extends SnapPlayer { at: number }
 interface View {
   sprite: Phaser.GameObjects.Sprite; gun: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text;
   buf: Sample[]; lastX: number; lastY: number; lastHp: number; hurtUntil: number; wasDead: boolean; lastJet: number; facing: number;
 }
-interface VBullet {
-  img: Phaser.GameObjects.Image; vx: number; vy: number; ttl: number; rocket: boolean;
-  weapon: WeaponKey; predicted: boolean; createdAt: number; originX: number; originY: number;
-}
+interface VBullet { img: Phaser.GameObjects.Image; vx: number; vy: number; ttl: number; rocket: boolean }
 interface ItemObj { type: string; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; spark: Phaser.GameObjects.Image; tx: number; ty: number }
 interface EndInfo { n: number; rounds: number; series: boolean; champion: string; winnerName: string; scores: { name: string; k: number; d: number; w: number; t: number }[]; tw: number[]; next: number }
 
@@ -25,9 +24,10 @@ const TEXT: Phaser.Types.GameObjects.Text.TextStyle = { fontFamily: 'monospace',
 const feetToCenter = (y: number) => y + CELL_H / 2 - FEET;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-const SLOT_W = 78, SLOT_H = 54, SLOT_GAP = 8, SLOT_Y = H - 76;
-const baseSlotX = (i: number) => W / 2 - (MAX_SLOTS * SLOT_W + (MAX_SLOTS - 1) * SLOT_GAP) / 2 + i * (SLOT_W + SLOT_GAP);
-const controlCenter = (id: ControlId) => getControlPosition(id);
+const BTN_BOMB = { r: 44 };
+const BTN_RELOAD = { r: 34 };
+const BTN_PICK = { r: 30 };
+const SLOT_W = 78, SLOT_H = 54, SLOT_GAP = 8;
 
 export class GameScene extends Phaser.Scene {
   private net!: Net;
@@ -38,19 +38,19 @@ export class GameScene extends Phaser.Scene {
 
   // local (predicted) player
   private me: Body | null = null;
+  private correctionX = 0;
+  private correctionY = 0;
   private meInfo: SnapPlayer | null = null;
   private prevInfo: SnapPlayer | null = null;
   private meDead = false;
   private meHurtUntil = 0;
   private turbo = false;
-  private seq = 0;
   private acc = 0;
   private lastSend = 0;
   private pending: InputCmd[] = [];
   private outbox: InputCmd[] = [];
   private aim = 0;
   private facing = 1;
-  private renderCorrection = { x: 0, y: 0 };
   private thrust = false;
   private dx = 0;
   private firing = false;
@@ -61,8 +61,6 @@ export class GameScene extends Phaser.Scene {
   private usingMouse = true;
   private mouseOnUi = false;
   private lastJetFx = 0;
-  private nextPredictedShotId = -1;
-  private predictedNextShotAt = 0;
 
   private meSprite!: Phaser.GameObjects.Sprite;
   private meGun!: Phaser.GameObjects.Image;
@@ -74,17 +72,14 @@ export class GameScene extends Phaser.Scene {
   private bullets = new Map<number, VBullet>();
 
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private joyPtr: Phaser.Input.Pointer | null = null;
   private aimPtr: Phaser.Input.Pointer | null = null;
-  private flyPtr: Phaser.Input.Pointer | null = null;
   private joyBase = { x: 0, y: 0 };
   private joyVec = { x: 0, y: 0 };
   private aimVec = { x: 0, y: 0 };
-  private aimStickActive = false;
-  private layoutEditing = false;
-  private dragControl: ControlId | null = null;
-  private dragPointer: Phaser.Input.Pointer | null = null;
-  private keyBindings = new Map<ActionId, Phaser.Input.Keyboard.Key>();
+  private controls: ControlLayout = loadControlLayout();
+  private touchDevice = false;
 
   private aimGfx!: Phaser.GameObjects.Graphics;
   private barGfx!: Phaser.GameObjects.Graphics;
@@ -105,40 +100,41 @@ export class GameScene extends Phaser.Scene {
   private overText!: Phaser.GameObjects.Text;
   private bannerText!: Phaser.GameObjects.Text;
   private itemText!: Phaser.GameObjects.Text;
+  private pickLabel!: Phaser.GameObjects.Text;
+  private reloadLabel!: Phaser.GameObjects.Text;
   private helpText!: Phaser.GameObjects.Text;
+  private moveLabel!: Phaser.GameObjects.Text;
+  private aimLabel!: Phaser.GameObjects.Text;
   private bombIcon!: Phaser.GameObjects.Image;
   private slotIcons: Phaser.GameObjects.Image[] = [];
   private slotTexts: Phaser.GameObjects.Text[] = [];
-  private touchLabels = new Map<ControlId, Phaser.GameObjects.Text>();
+  private slotNumberTexts: Phaser.GameObjects.Text[] = [];
   private feed: { msg: string; until: number }[] = [];
   private deathMsg = '';
   private endInfo: EndInfo | null = null;
   private endUntil = 0;
   private bannerUntil = 0;
   private lastSnap: Snap | null = null;
-  private arenaReady = false;
 
   constructor() { super('GameScene'); }
 
   private resetState() {
     this.map = null; this.solids = []; this.world = null;
-    this.me = null; this.meInfo = null; this.prevInfo = null; this.meDead = false; this.meHurtUntil = 0; this.turbo = false;
-    this.seq = 0; this.acc = 0; this.lastSend = 0; this.pending = []; this.outbox = [];
-    this.nextPredictedShotId = -1; this.predictedNextShotAt = 0;
+    this.me = null; this.correctionX = 0; this.correctionY = 0;
+    this.meInfo = null; this.prevInfo = null; this.meDead = false; this.meHurtUntil = 0; this.turbo = false;
+    this.acc = 0; this.lastSend = 0; this.pending = []; this.outbox = [];
     this.aim = 0; this.facing = 1; this.thrust = false; this.dx = 0; this.firing = false;
-    this.renderCorrection = { x: 0, y: 0 };
     this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1; this.mouseOnUi = false; this.lastJetFx = 0;
     this.views = new Map(); this.items = new Map(); this.bombObjs = new Map(); this.bullets = new Map();
-    this.joyPtr = null; this.aimPtr = null; this.flyPtr = null; this.joyVec = { x: 0, y: 0 };
-    this.aimVec = { x: 0, y: 0 }; this.aimStickActive = false;
-    this.layoutEditing = false; this.dragControl = null; this.dragPointer = null; this.keyBindings.clear();
-    this.slotIcons = []; this.slotTexts = []; this.touchLabels.clear(); this.feed = []; this.deathMsg = '';
+    this.joyPtr = null; this.aimPtr = null; this.joyVec = { x: 0, y: 0 };
+    this.aimVec = { x: 0, y: 0 };
+    this.slotIcons = []; this.slotTexts = []; this.slotNumberTexts = []; this.feed = []; this.deathMsg = '';
     this.endInfo = null; this.endUntil = 0; this.bannerUntil = 0; this.lastSnap = null;
-    this.arenaReady = false;
   }
 
   create() {
     this.resetState();
+    this.touchDevice = isTouchDevice();
     this.net = this.registry.get('net') as Net;
     this.myId = this.net.room.sessionId;
     this.input.mouse?.disableContextMenu();
@@ -158,61 +154,30 @@ export class GameScene extends Phaser.Scene {
     this.barGfx = this.add.graphics().setDepth(12);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.refreshKeyBindings();
+    this.keys = this.input.keyboard!.addKeys('A,D,W,R,G,E,Q,M,SPACE,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
 
-    const onControl = (p: Phaser.Input.Pointer, id: ControlId) => {
-      const center = controlCenter(id);
-      const radius = (id === 'joystick' || id === 'attack' ? JOY_R : id.startsWith('slot') ? 38 : 34) * getControlSettings().size;
-      return Phaser.Math.Distance.Between(p.x, p.y, center.x, center.y) < radius + 14;
-    };
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (!p.wasTouch) this.usingMouse = true; });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       audio.unlockAudio();
       if (p.wasTouch) this.usingMouse = false; else this.usingMouse = true;
-      if (this.layoutEditing) {
-        this.dragControl = CONTROL_IDS.find((id) => onControl(p, id)) ?? null;
-        this.dragPointer = this.dragControl ? p : null;
-        return;
+      for (let i = 0; i < MAX_SLOTS; i++) {
+        const left = this.slotX(i), top = this.slotY();
+        if (p.x > left && p.x < left + SLOT_W && p.y > top && p.y < top + SLOT_H) { this.selQ = i; if (!p.wasTouch) this.mouseOnUi = true; return; }
       }
-      const slot = CONTROL_IDS.filter((id) => id.startsWith('slot')).find((id) => onControl(p, id));
-      if (slot) {
-        const slotIndex = Number(slot.slice(4)) - 1;
-        if (slotIndex < (this.meInfo?.ws.length ?? MAX_SLOTS)) this.selQ = slotIndex;
-        if (!p.wasTouch) this.mouseOnUi = true;
-        return;
-      }
-      if (onControl(p, 'bomb')) { this.bombQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
-      if (onControl(p, 'reload')) { this.reloadQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
-      if (onControl(p, 'pickup')) { this.pickQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
-      if (p.wasTouch && onControl(p, 'joystick') && !this.joyPtr) {
-        this.joyPtr = p; this.joyBase = controlCenter('joystick');
-      } else if (p.wasTouch && onControl(p, 'fly') && !this.flyPtr) this.flyPtr = p;
-      else if (p.wasTouch && onControl(p, 'attack') && !this.aimPtr) {
-        this.aimPtr = p;
-        this.aimVec = { x: 0, y: 0 };
-        this.aimStickActive = false;
-      }
+      if (this.onControl(p, 'bomb', BTN_BOMB.r)) { this.bombQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
+      if (this.onControl(p, 'reload', BTN_RELOAD.r)) { this.reloadQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
+      if (this.onControl(p, 'pick', BTN_PICK.r)) { this.pickQ = true; if (!p.wasTouch) this.mouseOnUi = true; return; }
+      if (p.wasTouch && !this.joyPtr && this.onControl(p, 'move', JOY_R * 1.6)) {
+        this.joyPtr = p; this.joyBase = { ...this.controls.move };
+      } else if (p.wasTouch && !this.aimPtr && this.onControl(p, 'aim', JOY_R * 1.6)) this.aimPtr = p;
     });
     const release = (p: Phaser.Input.Pointer) => {
       if (p === this.joyPtr) this.joyPtr = null;
-      if (p === this.aimPtr) {
-        this.aimPtr = null;
-        this.aimVec = { x: 0, y: 0 };
-        this.aimStickActive = false;
-      }
-      if (p === this.flyPtr) this.flyPtr = null;
-      if (p === this.dragPointer) {
-        saveControlSettings();
-        this.dragPointer = null;
-        this.dragControl = null;
-      }
+      if (p === this.aimPtr) this.aimPtr = null;
       if (!p.wasTouch) this.mouseOnUi = false;
     };
     this.input.on('pointerup', release);
     this.input.on('pointerupoutside', release);
-    this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (this.layoutEditing && p === this.dragPointer && this.dragControl) updateControlPosition(this.dragControl, p.x, p.y);
-    });
     this.input.on('wheel', (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => this.cycleWeapon(dy > 0 ? 1 : -1));
 
     this.buildHud();
@@ -222,55 +187,18 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => { this.net.onSnap = null; this.net.onEvent = null; audio.jet(false); });
   }
 
-  setLayoutEditing(enabled: boolean) {
-    this.layoutEditing = enabled;
-    this.dragControl = null;
-    this.dragPointer = null;
-    this.joyPtr = null;
-    this.aimPtr = null;
-    this.flyPtr = null;
-    this.aimVec = { x: 0, y: 0 };
-    this.aimStickActive = false;
+  public refreshControlLayout() {
+    this.controls = loadControlLayout();
   }
 
-  private refreshKeyBindings() {
-    const keyboard = this.input.keyboard;
-    if (!keyboard) return;
-    const code = (key: string) => {
-      const normalized = key.toUpperCase();
-      if (normalized === 'SPACE') return Phaser.Input.Keyboard.KeyCodes.SPACE;
-      if (normalized === 'ARROWLEFT') return Phaser.Input.Keyboard.KeyCodes.LEFT;
-      if (normalized === 'ARROWRIGHT') return Phaser.Input.Keyboard.KeyCodes.RIGHT;
-      if (normalized === 'ARROWUP') return Phaser.Input.Keyboard.KeyCodes.UP;
-      if (normalized === 'ARROWDOWN') return Phaser.Input.Keyboard.KeyCodes.DOWN;
-      return normalized.length === 1 ? normalized.charCodeAt(0) : Phaser.Input.Keyboard.KeyCodes[normalized as keyof typeof Phaser.Input.Keyboard.KeyCodes];
-    };
-    this.keyBindings.clear();
-    const settings = getControlSettings();
-    for (const action of Object.keys(settings.keys) as ActionId[]) {
-      const keyCode = code(settings.keys[action]);
-      if (typeof keyCode === 'number') this.keyBindings.set(action, keyboard.addKey(keyCode));
-    }
+  private slotX(i: number) {
+    const width = MAX_SLOTS * SLOT_W + (MAX_SLOTS - 1) * SLOT_GAP;
+    return this.controls.slots.x - width / 2 + i * (SLOT_W + SLOT_GAP);
   }
-
-  private isActionDown(action: ActionId) {
-    return this.keyBindings.get(action)?.isDown ?? false;
-  }
-
-  private actionJustDown(action: ActionId) {
-    const key = this.keyBindings.get(action);
-    return key ? Phaser.Input.Keyboard.JustDown(key) : false;
-  }
-
-  refreshControls() {
-    this.refreshKeyBindings();
-  }
-
-  private slotRect(index: number) {
-    const center = controlCenter((`slot${index + 1}`) as ControlId);
-    const scale = getControlSettings().size;
-    const width = SLOT_W * scale, height = SLOT_H * scale;
-    return { x: center.x - width / 2, y: center.y - height / 2, width, height };
+  private slotY() { return this.controls.slots.y - SLOT_H / 2; }
+  private onControl(p: Phaser.Input.Pointer, name: keyof ControlLayout, radius: number) {
+    const c = this.controls[name];
+    return Phaser.Math.Distance.Between(p.x, p.y, c.x, c.y) < radius + 14;
   }
 
   // ---------- the map ----------
@@ -284,16 +212,6 @@ export class GameScene extends Phaser.Scene {
     this.mapText.setText(map.name);
     if (this.net.latest) this.handleSnap(this.net.latest);
     this.net.pendingEvents.splice(0).forEach((e) => this.handleEvent(e));
-    this.signalArenaReady();
-  }
-
-  private signalArenaReady() {
-    if (this.arenaReady || !this.me) return;
-    const onArenaReady = this.registry.get('onArenaReady');
-    if (typeof onArenaReady === 'function') {
-      this.arenaReady = true;
-      onArenaReady();
-    }
   }
 
   private buildHud() {
@@ -315,21 +233,22 @@ export class GameScene extends Phaser.Scene {
     this.statusText = st(W / 2, H / 2, { ...TEXT, fontSize: '28px', align: 'center' }, 0.5, 0.5);
     this.overText = st(W / 2, H / 2 - 10, { ...TEXT, fontSize: '24px', align: 'center' }, 0.5, 0.5);
     this.bannerText = st(W / 2, H / 3, { ...TEXT, fontSize: '56px', align: 'center', strokeThickness: 8 }, 0.5, 0.5);
-    for (const id of CONTROL_IDS) {
-      if (id === 'bomb') continue;
-      const label = st(0, 0, { ...TEXT, fontSize: '15px', strokeThickness: 3 }, 0.5, 0.5);
-      label.setText(id === 'attack' ? 'AIM + FIRE' : CONTROL_LABELS[id]);
-      this.touchLabels.set(id, label);
-    }
-    this.bombIcon = this.add.image(0, 0, 'w_grenade').setScrollFactor(0).setDepth(102);
-    this.bombText = st(0, 0, { ...TEXT, fontSize: '16px' });
+    this.pickLabel = st(this.controls.pick.x, this.controls.pick.y, { ...TEXT, fontSize: '22px' }, 0.5, 0.5);
+    this.pickLabel.setText('E');
+    this.reloadLabel = st(this.controls.reload.x, this.controls.reload.y, { ...TEXT, fontSize: '26px' }, 0.5, 0.5);
+    this.reloadLabel.setText('R');
+    this.bombIcon = this.add.image(this.controls.bomb.x, this.controls.bomb.y, 'w_grenade').setScrollFactor(0).setDepth(102);
+    this.bombText = st(this.controls.bomb.x + 22, this.controls.bomb.y + 18, { ...TEXT, fontSize: '18px' });
     for (let i = 0; i < MAX_SLOTS; i++) {
-      this.slotIcons.push(this.add.image(0, 0, 'w_pistol').setScrollFactor(0).setDepth(102).setVisible(false));
-      this.slotTexts.push(st(0, 0, { ...TEXT, fontSize: '13px', strokeThickness: 3 }, 0.5, 1));
+      this.slotIcons.push(this.add.image(this.slotX(i) + SLOT_W / 2, this.slotY() + 22, 'w_pistol').setScrollFactor(0).setDepth(102).setVisible(false));
+      this.slotTexts.push(st(this.slotX(i) + SLOT_W / 2, this.slotY() + SLOT_H - 4, { ...TEXT, fontSize: '13px', strokeThickness: 3 }, 0.5, 1));
+      this.slotNumberTexts.push(st(this.slotX(i) + 5, this.slotY() + 2, { ...TEXT, fontSize: '12px', strokeThickness: 3 }).setText(String(i + 1)));
     }
     this.itemText = this.add.text(0, 0, '', { ...TEXT, fontSize: '14px' }).setOrigin(0.5, 1).setDepth(60).setVisible(false);
     this.helpText = st(12, H - 10, { ...TEXT, fontSize: '12px' }, 0, 1);
-    this.helpText.setText('Customize controls with Settings');
+    this.helpText.setText('A/D move | W or Space fly | hold mouse: fire | 1 2 3 or Q or wheel: choose gun | E: pick up / swap | G bomb | R reload | M mute');
+    this.moveLabel = st(0, 0, { ...TEXT, fontSize: '12px' }, 0.5, 0.5).setText('MOVE');
+    this.aimLabel = st(0, 0, { ...TEXT, fontSize: '12px' }, 0.5, 0.5).setText('AIM / FIRE');
   }
 
   private addFeed(msg: string) {
@@ -402,34 +321,12 @@ export class GameScene extends Phaser.Scene {
     switch (e.type) {
       case 'shot': {
         const rocket = e.w === 'rpg';
-        const predicted = e.o === this.myId
-          ? [...this.bullets.entries()]
-            .filter(([, bullet]) => bullet.predicted && bullet.weapon === e.w)
-            .sort((a, b) => a[1].createdAt - b[1].createdAt)[0]
-          : undefined;
-        let img: Phaser.GameObjects.Image;
-        let elapsed = 0;
-        if (predicted) {
-          const [localId, bullet] = predicted;
-          this.bullets.delete(localId);
-          img = bullet.img;
-          elapsed = Math.max(0, (performance.now() - bullet.createdAt) / 1000);
-          img.setPosition(e.x + e.vx * elapsed, e.y + e.vy * elapsed);
-          img.setVisible(true);
-        } else {
-          img = this.add.image(e.x, e.y, rocket ? 'rocket' : 'bullet').setDepth(9);
-        }
-        img.setTexture(rocket ? 'rocket' : 'bullet').setRotation(Math.atan2(e.vy, e.vx));
-        const ttl = e.ttl - elapsed;
-        if (ttl <= 0) img.destroy();
-        else this.bullets.set(e.id, {
-          img, vx: e.vx, vy: e.vy, ttl, rocket, weapon: e.w,
-          predicted: false, createdAt: performance.now(), originX: e.x, originY: e.y,
-        });
+        const img = this.add.image(e.x, e.y, rocket ? 'rocket' : 'bullet').setDepth(9).setRotation(Math.atan2(e.vy, e.vx));
+        this.bullets.set(e.id, { img, vx: e.vx, vy: e.vy, ttl: e.ttl, rocket });
         const a = Math.atan2(e.vy, e.vx);
-        if (!predicted) this.flash(e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, 0xffe27a, 9, 90);
+        this.flash(e.x + Math.cos(a) * 26, e.y + Math.sin(a) * 26, 0xffe27a, 9, 90);
         const def = isWeapon(e.w) ? WEAPONS[e.w] : null;
-        if (def && !predicted) {
+        if (def) {
           const sfx = def.cls === 'heavy' ? 'rocket' : def.cls === 'melee' ? 'knife' : def.cls;
           audio.play(sfx as audio.Sfx, this.volumeAt(e.x, e.y));
           if (def.kind === 'gun' && this.distToMe(e.x, e.y) < 900) {          // an empty shell pops out
@@ -464,6 +361,10 @@ export class GameScene extends Phaser.Scene {
       }
       case 'round': {
         this.endInfo = null; this.endUntil = 0; this.feed = [];
+        this.me = null;
+        this.correctionX = 0; this.correctionY = 0;
+        this.pending = []; this.outbox = []; this.acc = 0;
+        this.views.forEach((view) => { view.buf.length = 0; });
         this.bannerText.setText(`ROUND ${e.n}`); this.bannerUntil = this.time.now + 2200;
         audio.play('round');
         break;
@@ -472,6 +373,7 @@ export class GameScene extends Phaser.Scene {
         this.endInfo = e as unknown as EndInfo;
         this.endUntil = this.time.now + e.next * 1000;
         audio.play(e.series ? 'win' : 'round');
+        if (e.series) this.time.delayedCall(e.next * 1000, () => this.net.onSeriesComplete?.());
         break;
       }
     }
@@ -506,21 +408,21 @@ export class GameScene extends Phaser.Scene {
     }
     this.syncItems(s);
     this.syncBombs(s);
-    this.signalArenaReady();
   }
 
   private reconcile(p: SnapPlayer) {
+    this.net.observeInputAck(p.ack);
     const wasDead = this.meDead;
     const prev = this.meInfo;
     this.meDead = p.d;
     this.prevInfo = prev;
     this.meInfo = p;
     this.turbo = p.tb > 0;
-    this.seq = Math.max(this.seq, p.ack);
 
     if (prev && !p.d) {
       if (p.hp < prev.hp) { this.meHurtUntil = this.time.now + 220; audio.play('hurt'); this.cameras.main.flash(90, 255, 60, 60, true); }
-      if (p.hp > prev.hp || p.ws.length > prev.ws.length || p.bm > prev.bm || (p.tb > 0 && prev.tb <= 0) || (p.ws.length === prev.ws.length && p.w !== prev.w && p.cu === prev.cu)) audio.play('pickup');
+      const ammoAdded = p.ws.some((slot, i) => slot[2] > (prev.ws[i]?.[2] ?? slot[2]));
+      if (p.hp > prev.hp || ammoAdded || p.ws.length > prev.ws.length || p.bm > prev.bm || (p.tb > 0 && prev.tb <= 0) || (p.ws.length === prev.ws.length && p.w !== prev.w && p.cu === prev.cu)) audio.play('pickup');
       if (p.cu !== prev.cu && p.ws.length === prev.ws.length) audio.play('swap');
       if (p.rl && !prev.rl) audio.play('reload');
     }
@@ -530,34 +432,34 @@ export class GameScene extends Phaser.Scene {
     this.pending = this.pending.filter((c) => c.seq > p.ack);
     if (!this.me || p.d || wasDead) {
       this.me = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.g };
-      this.renderCorrection = { x: 0, y: 0 };
+      this.correctionX = 0;
+      this.correctionY = 0;
       this.pending = [];
       this.outbox = [];
       return;
     }
+    const previousX = this.me.x;
+    const previousY = this.me.y;
     const t: Body = { x: p.x, y: p.y, vx: p.vx, vy: p.vy, onGround: p.g };
     for (const c of this.pending) stepBody(t, c.dx, c.thrust, this.turbo, this.solids);
-    const oldRenderX = this.me.x + this.renderCorrection.x;
-    const oldRenderY = this.me.y + this.renderCorrection.y;
-    if (Math.hypot(t.x - this.me.x, t.y - this.me.y) > 180) {
-      this.renderCorrection = { x: 0, y: 0 };
-    } else {
-      this.renderCorrection = { x: oldRenderX - t.x, y: oldRenderY - t.y };
-    }
-    this.me = t;
+    this.correctionX += previousX - t.x;
+    this.correctionY += previousY - t.y;
+    Object.assign(this.me, t);
   }
 
   // ---------- things lying on the ground ----------
   private itemVisual(type: string): { key: string; scale: number } {
     if (isWeapon(type)) return { key: 'w_' + type, scale: 0.5 * Math.max(1, 38 / WEAPONS[type].len) };
-    if (type === 'medkit') return { key: 'medkit', scale: 0.9 };
     if (type === 'turbo') return { key: 'icon_turbo_flat', scale: 1 };
+    if (type === 'medkit') return { key: 'icon_medkit', scale: 0.8 };
+    if (type === 'ammo') return { key: 'icon_ammo', scale: 0.8 };
     return { key: 'w_' + type, scale: 0.8 };
   }
   private itemName(type: string): string {
     if (isWeapon(type)) return WEAPONS[type].name;
-    if (type === 'medkit') return 'FIRST AID KIT +50 HP';
     if (type === 'turbo') return 'TURBO ROCKET';
+    if (type === 'medkit') return 'FIRST AID KIT +40 HP';
+    if (type === 'ammo') return 'AMMO BOX +100';
     return type in BOMBS ? BOMBS[type as 'grenade'].name : type;
   }
 
@@ -604,16 +506,13 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.world) updateBackdrop(this.world, cam);
 
-    if (!this.isTyping() && this.actionJustDown('mute')) { audio.setMuted(!audio.isMuted()); document.getElementById('mute')?.dispatchEvent(new Event('sync')); }
-    const correctionDecay = Math.exp(-12 * Math.min(delta, 100) / 1000);
-    this.renderCorrection.x *= correctionDecay;
-    this.renderCorrection.y *= correctionDecay;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.M)) { audio.setMuted(!audio.isMuted()); document.getElementById('mute')?.dispatchEvent(new Event('sync')); }
     this.readInput();
     this.runLocalSimulation(delta);
     this.updateBullets(delta / 1000);
     this.aimGfx.clear();
     this.barGfx.clear();
-    this.renderMe();
+    this.renderMe(delta);
     this.renderRemotes();
     this.renderItems();
     this.renderHud();
@@ -625,28 +524,15 @@ export class GameScene extends Phaser.Scene {
     if (n > 1 && this.meInfo) this.selQ = (this.meInfo.cu + dir + n) % n;
   }
 
-  private isTyping() {
-    const active = document.activeElement;
-    return active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ||
-      document.getElementById('controlSettings')?.classList.contains('open') ||
-      (active instanceof HTMLElement && active.isContentEditable);
-  }
-
   private readInput() {
-    if (this.isTyping()) {
-      this.dx = 0; this.thrust = false; this.firing = false;
-      this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1;
-      return;
-    }
-    let dx = Number(this.cursors.right.isDown || this.isActionDown('right')) - Number(this.cursors.left.isDown || this.isActionDown('left'));
-    let thrust = this.cursors.up.isDown || this.isActionDown('fly') || this.isActionDown('flyAlt') || !!this.flyPtr?.isDown;
+    let dx = Number(this.cursors.right.isDown || this.keys.D.isDown) - Number(this.cursors.left.isDown || this.keys.A.isDown);
+    let thrust = this.cursors.up.isDown || this.keys.W.isDown || this.keys.SPACE.isDown;
     let joyAngle: number | null = null;
-    let aimStickAngle: number | null = null;
     if (this.joyPtr) {
       const p = this.joyPtr;
-      const radius = JOY_R * getControlSettings().size;
-      let vx = (p.x - this.joyBase.x) / radius;
-      let vy = (p.y - this.joyBase.y) / radius;
+      const base = this.controls.move;
+      let vx = (p.x - base.x) / JOY_R;
+      let vy = (p.y - base.y) / JOY_R;
       const len = Math.hypot(vx, vy);
       if (len > 1) { vx /= len; vy /= len; }
       this.joyVec = { x: vx, y: vy };
@@ -654,37 +540,30 @@ export class GameScene extends Phaser.Scene {
       if (vy < -0.35) thrust = true;
       if (len > 0.35) joyAngle = Math.atan2(vy, vx);      // the soldier turns toward where you steer
     } else this.joyVec = { x: 0, y: 0 };
-    if (this.aimPtr) {
-      const base = controlCenter('attack');
-      const radius = JOY_R * getControlSettings().size;
-      let vx = (this.aimPtr.x - base.x) / radius;
-      let vy = (this.aimPtr.y - base.y) / radius;
+    if (this.aimPtr?.isDown) {
+      let vx = (this.aimPtr.x - this.controls.aim.x) / JOY_R;
+      let vy = (this.aimPtr.y - this.controls.aim.y) / JOY_R;
       const len = Math.hypot(vx, vy);
       if (len > 1) { vx /= len; vy /= len; }
       this.aimVec = { x: vx, y: vy };
-      this.aimStickActive = len > 0.18;
-      if (this.aimStickActive) aimStickAngle = Math.atan2(vy, vx);
-    } else {
-      this.aimVec = { x: 0, y: 0 };
-      this.aimStickActive = false;
-    }
+      if (len > 0.12) this.aim = Math.atan2(vy, vx);
+    } else this.aimVec = { x: 0, y: 0 };
     this.dx = dx;
     this.thrust = thrust;
 
     const mouse = this.input.mousePointer;
-    this.firing = this.aimStickActive || this.isActionDown('fire') || (this.usingMouse && mouse.leftButtonDown() && !this.mouseOnUi);
-    if (this.actionJustDown('bomb')) this.bombQ = true;
-    if (this.actionJustDown('reload')) this.reloadQ = true;
-    if (this.actionJustDown('pickup')) this.pickQ = true;
-    if (this.actionJustDown('nextWeapon')) this.cycleWeapon(1);
+    this.firing = !!this.aimPtr?.isDown || (this.usingMouse && mouse.leftButtonDown() && !this.mouseOnUi);
+    if (Phaser.Input.Keyboard.JustDown(this.keys.G)) this.bombQ = true;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.R)) this.reloadQ = true;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.E)) this.pickQ = true;
+    if (Phaser.Input.Keyboard.JustDown(this.keys.Q)) this.cycleWeapon(1);
     const n = this.meInfo?.ws.length ?? 1;
-    (['slot1', 'slot2', 'slot3'] as ActionId[]).forEach((action, i) => { if (this.actionJustDown(action) && i < n) this.selQ = i; });
+    [this.keys.ONE, this.keys.TWO, this.keys.THREE].forEach((k, i) => { if (Phaser.Input.Keyboard.JustDown(k) && i < n) this.selQ = i; });
 
     if (!this.me) return;
     const cam = this.cameras.main;
-    const ptr = this.usingMouse ? mouse : null;
-    if (aimStickAngle !== null) this.aim = aimStickAngle;
-    else if (ptr) {
+    if (!this.aimPtr?.isDown && this.usingMouse && !this.mouseOnUi) {
+      const ptr = mouse;
       ptr.updateWorldPoint(cam);
       this.aim = Math.atan2(ptr.worldY - (this.me.y - 30), ptr.worldX - this.me.x);
     } else if (joyAngle !== null) this.aim = joyAngle;
@@ -698,10 +577,9 @@ export class GameScene extends Phaser.Scene {
       while (this.acc >= FIXED_DT) {
         this.acc -= FIXED_DT;
         const cmd: InputCmd = {
-          seq: ++this.seq, dx: this.dx, thrust: this.thrust, aim: this.aim, fire: this.firing,
+          seq: this.net.nextInputSeq(), dx: this.dx, thrust: this.thrust, aim: this.aim, fire: this.firing,
           bomb: this.bombQ, reload: this.reloadQ, pick: this.pickQ, sel: this.selQ,
         };
-        if (cmd.fire) this.predictShot();
         this.bombQ = false; this.reloadQ = false; this.pickQ = false; this.selQ = -1;     // one-shot actions
         stepBody(this.me, cmd.dx, cmd.thrust, this.turbo, this.solids);                    // predict movement immediately
         this.pending.push(cmd);
@@ -710,57 +588,21 @@ export class GameScene extends Phaser.Scene {
       if (this.pending.length > 180) this.pending.splice(0, this.pending.length - 180);
     }
     const now = performance.now();
-    if (this.outbox.length && (this.outbox.length >= 2 || now - this.lastSend > 16)) {
+    if (this.outbox.length && (this.outbox.length >= 2 || now - this.lastSend > 33)) {
       this.net.sendInputs(this.outbox.splice(0, 10));
       this.lastSend = now;
     }
   }
 
-  private predictShot() {
-    const info = this.meInfo;
-    const body = this.me;
-    if (!info || !body || this.meDead) return;
-    const weapon = WEAPONS[info.w];
-    const now = performance.now();
-    if (weapon.kind === 'melee' || info.rl || now < this.predictedNextShotAt) return;
-    if (info.am <= 0) return;
-    this.predictedNextShotAt = now + weapon.rate;
-
-    const angle = this.aim + (Math.random() - 0.5) * 2 * weapon.spread;
-    const originX = body.x + this.renderCorrection.x + Math.cos(this.aim) * 10;
-    const originY = body.y + this.renderCorrection.y - 30 + Math.sin(this.aim) * 10;
-    const rocket = weapon.kind === 'rocket';
-    const img = this.add.image(originX, originY, rocket ? 'rocket' : 'bullet')
-      .setDepth(9).setRotation(angle);
-    const id = this.nextPredictedShotId--;
-    this.bullets.set(id, {
-      img, vx: Math.cos(angle) * weapon.speed, vy: Math.sin(angle) * weapon.speed,
-      ttl: weapon.life, rocket, weapon: info.w, predicted: true,
-      createdAt: now, originX, originY,
-    });
-    this.flash(originX + Math.cos(angle) * 26, originY + Math.sin(angle) * 26, 0xffe27a, 9, 90);
-    const sfx = weapon.cls === 'heavy' ? 'rocket' : weapon.cls === 'melee' ? 'knife' : weapon.cls;
-    audio.play(sfx as audio.Sfx, this.volumeAt(originX, originY));
-  }
-
   // Bullets are drawn here from the server's "shot" events; the server decides what they really hit.
   private updateBullets(dt: number) {
-    const now = performance.now();
     for (const [id, b] of this.bullets) {
-      if (b.predicted && now - b.createdAt > 2500) {
-        b.img.destroy();
-        this.bullets.delete(id);
-        continue;
-      }
       const x0 = b.img.x, y0 = b.img.y;
       const x1 = x0 + b.vx * dt, y1 = y0 + b.vy * dt;
       let blocked = false;
       for (const s of this.solids) if (segHit(x0, y0, x1, y1, s) !== null) { blocked = true; break; }
       b.ttl -= dt;
-      if (blocked || b.ttl <= 0) {
-        if (b.predicted) { b.img.setVisible(false); continue; }
-        b.img.destroy(); this.bullets.delete(id); continue;
-      }
+      if (blocked || b.ttl <= 0) { b.img.destroy(); this.bullets.delete(id); continue; }
       b.img.setPosition(x1, y1);
       if (b.rocket && Math.random() < 0.6) this.flash(x1 - Math.cos(b.img.rotation) * 12, y1 - Math.sin(b.img.rotation) * 12, 0xcfd8dc, 5, 400, 1.8);
     }
@@ -796,31 +638,34 @@ export class GameScene extends Phaser.Scene {
     this.aimGfx.lineStyle(2, color, 0.4).lineBetween(cx + Math.cos(aim) * (len + 4), cy + Math.sin(aim) * (len + 4), cx + Math.cos(aim) * (len + 22), cy + Math.sin(aim) * (len + 22));
   }
 
-  private renderMe() {
+  private renderMe(delta: number) {
     const m = this.me;
     if (!m) return;
+    const correctionDecay = Math.exp(-Math.max(0, delta) / 90);
+    this.correctionX *= correctionDecay;
+    this.correctionY *= correctionDecay;
+    const renderX = m.x + this.correctionX;
+    const renderY = m.y + this.correctionY;
     this.statusText.setVisible(false);
     const info = this.meInfo;
     const show = !this.meDead;
     const now = this.time.now;
-    const x = m.x + this.renderCorrection.x;
-    const y = m.y + this.renderCorrection.y;
     this.meSprite.setVisible(show);
     this.meLabel.setVisible(show);
-    this.meSprite.setPosition(x, feetToCenter(y));
+    this.meSprite.setPosition(renderX, feetToCenter(renderY));
     this.meSprite.setFlipX(this.facing < 0);
     // lean into the direction of flight
     this.meSprite.setAngle(m.onGround ? 0 : clamp((m.vx / SPEED) * 18, -18, 18));
     this.meSprite.setAlpha(info?.iv && Math.floor(now / 100) % 2 ? 0.4 : 1);
     this.animate(this.meSprite, m.vx, this.thrust, m.onGround, this.firing, now < this.meHurtUntil);
     const team = info?.tm ?? -1;
-    this.meLabel.setText(this.nameOf(this.myId)).setPosition(x, y - 94).setColor(team >= 0 ? TEAM_TEXT[team] : '#9dffa8');
+    this.meLabel.setText(this.nameOf(this.myId)).setPosition(renderX, renderY - 94).setColor(team >= 0 ? TEAM_TEXT[team] : '#9dffa8');
     const w = (info?.w ?? 'pistol') as WeaponKey;
-    this.placeGun(this.meGun, x, y, this.aim, w, show);
+    this.placeGun(this.meGun, renderX, renderY, this.aim, w, show);
     if (show) {
-      this.drawAim(x, y, this.aim, 0x9dffa8, WEAPONS[w].len);
-      this.hpBar(x, y, info?.hp ?? 100, team);
-      if (this.thrust && now - this.lastJetFx > 55) { this.jetFx(x, y, this.facing); this.lastJetFx = now; }
+      this.drawAim(renderX, renderY, this.aim, 0x9dffa8, WEAPONS[w].len);
+      this.hpBar(renderX, renderY, info?.hp ?? 100, team);
+      if (this.thrust && now - this.lastJetFx > 55) { this.jetFx(renderX, renderY, this.facing); this.lastJetFx = now; }
     }
   }
 
@@ -884,8 +729,7 @@ export class GameScene extends Phaser.Scene {
     const teams = this.net.info.mode === 'teams';
 
     this.roundText.setText(`ROUND ${this.net.info.n} / ${this.net.info.rounds}`);
-    const objective = w?.code === 'PUBLIC' ? 'Open team arena · join anytime' : `First to ${this.net.info.target} kills`;
-    this.mapText.setText(`${this.map?.name ?? ''}   |   ${objective}${w ? `   |   ${w.code === 'PUBLIC' ? 'Public' : 'Room ' + w.code}  ${roster.length}/${w.maxPlayers}` : ''}`);
+    this.mapText.setText(`${this.map?.name ?? ''}   |   First to ${this.net.info.target} kills${w ? `   |   ${w.code === 'PUBLIC' ? 'Public' : 'Room ' + w.code}  ${roster.length}/${w.maxPlayers}` : ''}`);
     this.teamTextB.setVisible(teams).setText(teams && snap ? `${TEAM_NAMES[0]} ${snap.tk[0]}` : '');
     this.teamTextR.setVisible(teams).setText(teams && snap ? `${snap.tk[1]} ${TEAM_NAMES[1]}` : '');
 
@@ -907,59 +751,46 @@ export class GameScene extends Phaser.Scene {
     const hp = info?.hp ?? 100;
     h.fillStyle(0x1b2733, 0.85).fillRoundedRect(90, 14, 232, 30, 8);
     h.fillStyle(hp > 60 ? 0x4cd964 : hp > 30 ? 0xffc107 : 0xff4a3c).fillRoundedRect(94, 18, 224 * (hp / 100), 22, 6);
-    const settings = getControlSettings();
-    const touchAlpha = settings.opacity;
-    const radius = JOY_R * settings.size;
-    const joy = controlCenter('joystick');
-    h.fillStyle(0xffffff, touchAlpha * 0.12).fillCircle(joy.x, joy.y, radius);
-    h.lineStyle(this.layoutEditing ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.55).strokeCircle(joy.x, joy.y, radius);
-    const joyVector = this.joyPtr ? this.joyVec : { x: 0, y: 0 };
-    h.fillStyle(0xffffff, touchAlpha * 0.55).fillCircle(joy.x + joyVector.x * radius, joy.y + joyVector.y * radius, 28 * settings.size);
-    this.touchLabels.get('joystick')?.setPosition(joy.x, joy.y + radius + 13).setAlpha(touchAlpha).setScale(settings.size);
-    for (const id of CONTROL_IDS) {
-      if (id === 'joystick' || id.startsWith('slot')) continue;
-      const center = controlCenter(id);
-      const buttonRadius = 34 * settings.size;
-      if (id === 'attack') {
-        const attackRadius = radius;
-        h.fillStyle(0xffffff, touchAlpha * 0.12).fillCircle(center.x, center.y, attackRadius);
-        h.lineStyle(this.layoutEditing && id === this.dragControl ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.55).strokeCircle(center.x, center.y, attackRadius);
-        h.fillStyle(0xffffff, touchAlpha * 0.55).fillCircle(center.x + this.aimVec.x * attackRadius, center.y + this.aimVec.y * attackRadius, 28 * settings.size);
-      } else {
-        h.fillStyle(0x1b2733, touchAlpha * 0.78).fillCircle(center.x, center.y, buttonRadius);
-        h.lineStyle(this.layoutEditing && id === this.dragControl ? 4 : 3, this.layoutEditing ? 0xffd34d : 0xffffff, touchAlpha * 0.65).strokeCircle(center.x, center.y, buttonRadius);
-      }
-      const label = this.touchLabels.get(id);
-      label?.setPosition(center.x, id === 'attack' ? center.y + radius + 13 : center.y).setAlpha(touchAlpha).setScale(settings.size);
-    }
-    if (this.layoutEditing) {
-      for (const id of CONTROL_IDS) {
-        const center = controlCenter(id);
-        if (id.startsWith('slot')) {
-          const rect = this.slotRect(Number(id.slice(4)) - 1);
-          h.lineStyle(3, id === this.dragControl ? 0xffd34d : 0xffffff, 0.9).strokeRoundedRect(rect.x, rect.y, rect.width, rect.height, 8);
-          this.touchLabels.get(id)?.setPosition(center.x, rect.y - 13).setVisible(true).setAlpha(1);
-        }
-      }
+    const bomb = this.controls.bomb, reload = this.controls.reload, pick = this.controls.pick;
+    h.fillStyle(0x1b2733, 0.7).fillCircle(bomb.x, bomb.y, BTN_BOMB.r).fillCircle(reload.x, reload.y, BTN_RELOAD.r).fillCircle(pick.x, pick.y, BTN_PICK.r);
+    h.lineStyle(3, 0xffffff, 0.6).strokeCircle(bomb.x, bomb.y, BTN_BOMB.r).strokeCircle(reload.x, reload.y, BTN_RELOAD.r).strokeCircle(pick.x, pick.y, BTN_PICK.r);
+    this.pickLabel.setPosition(pick.x, pick.y);
+    this.reloadLabel.setPosition(reload.x, reload.y);
+    this.bombIcon.setPosition(bomb.x, bomb.y);
+    this.bombText.setPosition(bomb.x + 22, bomb.y + 18);
+    if (this.touchDevice) {
+      const move = this.controls.move, aim = this.controls.aim;
+      h.fillStyle(0xffffff, 0.12).fillCircle(move.x, move.y, JOY_R).fillCircle(aim.x, aim.y, JOY_R);
+      h.lineStyle(3, 0xffffff, 0.5).strokeCircle(move.x, move.y, JOY_R).strokeCircle(aim.x, aim.y, JOY_R);
+      h.fillStyle(0xffffff, 0.55)
+        .fillCircle(move.x + this.joyVec.x * JOY_R, move.y + this.joyVec.y * JOY_R, 28)
+        .fillCircle(aim.x + this.aimVec.x * JOY_R, aim.y + this.aimVec.y * JOY_R, 28);
+      h.lineStyle(2, 0xffd34d, 0.55)
+        .strokeCircle(move.x, move.y, JOY_R)
+        .strokeCircle(aim.x, aim.y, JOY_R);
+      this.moveLabel.setPosition(move.x, move.y - JOY_R - 12).setVisible(true);
+      this.aimLabel.setPosition(aim.x, aim.y - JOY_R - 12).setVisible(true);
     } else {
-      for (const id of CONTROL_IDS) if (id.startsWith('slot')) this.touchLabels.get(id)?.setVisible(false);
+      this.moveLabel.setVisible(false);
+      this.aimLabel.setVisible(false);
     }
 
     // the three weapon slots: tap or press 1, 2, 3 to choose
     for (let i = 0; i < MAX_SLOTS; i++) {
+      const left = this.slotX(i), top = this.slotY();
       const has = info && i < info.ws.length;
       const sel = !!info && info.cu === i && !!has;
-      const rect = this.slotRect(i);
-      h.fillStyle(sel ? 0x3a5a7a : 0x1b2733, has ? touchAlpha : touchAlpha * 0.4).fillRoundedRect(rect.x, rect.y, rect.width, rect.height, 8);
-      h.lineStyle(sel ? 4 : 2, sel ? 0xffd34d : 0xffffff, sel ? 1 : touchAlpha * 0.5).strokeRoundedRect(rect.x, rect.y, rect.width, rect.height, 8);
+      h.fillStyle(sel ? 0x3a5a7a : 0x1b2733, has ? 0.9 : 0.4).fillRoundedRect(left, top, SLOT_W, SLOT_H, 8);
+      h.lineStyle(sel ? 4 : 2, sel ? 0xffd34d : 0xffffff, sel ? 1 : 0.35).strokeRoundedRect(left, top, SLOT_W, SLOT_H, 8);
       const icon = this.slotIcons[i], txt = this.slotTexts[i];
-      icon.setPosition(rect.x + rect.width / 2, rect.y + rect.height * 0.42).setAlpha(touchAlpha);
-      txt.setPosition(rect.x + rect.width / 2, rect.y + rect.height - 4).setScale(settings.size).setAlpha(touchAlpha);
+      icon.setPosition(left + SLOT_W / 2, top + 22);
+      txt.setPosition(left + SLOT_W / 2, top + SLOT_H - 4);
+      this.slotNumberTexts[i].setPosition(left + 5, top + 2);
       if (info && has) {
         const [k, am, rs] = info.ws[i];
         const def = WEAPONS[k];
         icon.setTexture('w_' + k).setVisible(true);
-        icon.setScale(Math.min(0.5 * settings.size, (rect.width - 16) / icon.width, (rect.height * 0.55) / icon.height));
+        icon.setScale(Math.min(0.5, 62 / icon.width, 26 / icon.height));
         txt.setText(def.kind === 'melee' ? '' : `${am}/${rs < 0 ? '\u221e' : rs}`);
       } else { icon.setVisible(false); txt.setText(''); }
     }
@@ -968,9 +799,8 @@ export class GameScene extends Phaser.Scene {
       const def = WEAPONS[info.w];
       this.weaponText.setText(def.kind === 'melee' ? def.name : `${def.name}  ${info.am}/${info.rs < 0 ? '\u221e' : info.rs}`);
       this.subText.setText([info.rl ? 'RELOADING' : '', info.tb > 0 ? `TURBO ${Math.ceil(info.tb / 1000)}s` : ''].filter(Boolean).join('   '));
-      const bomb = controlCenter('bomb');
-      this.bombIcon.setTexture('w_' + info.bk).setPosition(bomb.x, bomb.y - 3).setScale(0.65 * settings.size).setAlpha(touchAlpha);
-      this.bombText.setText(`x${info.bm}`).setPosition(bomb.x + 21 * settings.size, bomb.y + 17 * settings.size).setScale(settings.size).setAlpha(touchAlpha);
+      this.bombIcon.setTexture('w_' + info.bk).setScale(0.8);
+      this.bombText.setText(`x${info.bm}`);
     }
     this.helpText.setVisible(this.usingMouse);
 
@@ -978,10 +808,9 @@ export class GameScene extends Phaser.Scene {
     this.feedText.setText(this.feed.map((f) => f.msg).join('\n'));
 
     const m = this.me, mp = this.map;
-    const outside = !!m && !!mp && outOfBounds(m, mp);
-    const nearEdge = !!m && !!mp && (m.x < 150 || m.x > mp.W - 150 || m.y < mp.killTop + 150 || m.y > mp.killBottom - 150);
-    const warn = !this.meDead && (outside || nearEdge);
-    const warning = outside ? 'OUTSIDE ARENA! HEALTH DRAINING' : 'WARNING: RETURN TO THE ARENA';
+    const outside = !!m && !!mp && (m.x < 0 || m.x > mp.W || m.y < mp.killTop || m.y > mp.killBottom);
+    const warn = !!m && !!mp && !this.meDead && (outside || m.x < 150 || m.x > mp.W - 150 || m.y < mp.killTop + 150 || m.y > mp.killBottom - 150);
+    const warning = outside ? 'OUTSIDE ARENA - RETURN NOW! HP DRAINING' : 'WARNING: RETURN TO THE ARENA';
     this.warnText.setText(warn && Math.floor(now / 250) % 2 ? warning : '');
     if (this.meDead) this.statusText.setText(`${this.deathMsg || 'You died'}\nRespawning...`).setVisible(true);
 
@@ -993,9 +822,7 @@ export class GameScene extends Phaser.Scene {
       const secs = Math.max(0, Math.ceil((this.endUntil - now) / 1000));
       const head = e.series ? `SERIES OVER\nChampion: ${e.champion}` : `ROUND ${e.n} OVER\n${e.winnerName} wins the round`;
       const rows = e.scores.slice(0, 8).map((r, i) => `${i + 1}. ${r.name.padEnd(13).slice(0, 13)} ${String(r.k).padStart(2)} kills  ${r.d} deaths  ${r.w} rounds won`);
-      const foot = e.series
-        ? (this.net.welcome?.code === 'PUBLIC' ? 'Match complete. Leave to find another match.' : `New series in ${secs}s`)
-        : `Next round in ${secs}s (new map)`;
+      const foot = e.series ? `New series in ${secs}s` : `Next round in ${secs}s (new map)`;
       this.overText.setText([head, '', ...rows, '', foot].join('\n')).setVisible(true);
       h.fillStyle(0x000000, 0.45).fillRect(W / 2 - 330, H / 2 - 200, 660, 400);
     } else this.overText.setVisible(false);

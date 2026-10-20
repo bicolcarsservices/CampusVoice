@@ -65,10 +65,15 @@ export function makeTextures(scene: Phaser.Scene) {
   g.fillStyle(0xd23a3a); g.fillTriangle(44, 8, 36, 2, 36, 14);
   g.fillStyle(0xffb300); g.fillTriangle(0, 8, 8, 3, 8, 13);
   tex('icon_turbo_flat', 46, 16);
-  g.fillStyle(0x174a34); g.fillRoundedRect(2, 2, 36, 28, 5);
-  g.lineStyle(2, 0xffffff); g.strokeRoundedRect(2, 2, 36, 28, 5);
-  g.fillStyle(0xffffff); g.fillRoundedRect(16, 7, 8, 18, 2); g.fillRoundedRect(11, 12, 18, 8, 2);
-  tex('medkit', 40, 32);
+  g.fillStyle(0xffffff); g.fillRoundedRect(2, 3, 36, 26, 5);
+  g.lineStyle(3, 0x2d6a4f); g.strokeRoundedRect(2, 3, 36, 26, 5);
+  g.fillStyle(0xe53935); g.fillRect(17, 7, 6, 18); g.fillRect(11, 13, 18, 6);
+  tex('icon_medkit', 40, 32);
+  g.fillStyle(0x556b2f); g.fillRoundedRect(2, 3, 36, 26, 4);
+  g.lineStyle(3, 0x26351b); g.strokeRoundedRect(2, 3, 36, 26, 4);
+  g.fillStyle(0xffd166); g.fillRect(9, 8, 5, 15); g.fillRect(18, 8, 5, 15); g.fillRect(27, 8, 5, 15);
+  g.fillStyle(0x9c6b30); g.fillRect(9, 8, 5, 4); g.fillRect(18, 8, 5, 4); g.fillRect(27, 8, 5, 4);
+  tex('icon_ammo', 40, 32);
   g.fillStyle(0xffffff); g.fillRect(4, 0, 2, 10); g.fillRect(0, 4, 10, 2); g.fillStyle(0xfff3a0); g.fillRect(3, 3, 4, 4);
   tex('twinkle', 10, 10);
 

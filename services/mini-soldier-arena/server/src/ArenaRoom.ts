@@ -5,34 +5,33 @@ import {
 } from './shared/sim';
 import {
   WEAPONS, BOMBS, WeaponKey, BombKind, PickupType, PickupCat, START_WEAPON, MAX_SLOTS, PICKUP_COUNTS,
-  PICKUP_RESPAWN_MS, DROP_LIFETIME_MS, GUN_WEIGHTS, isWeapon, catOf,
+  PICKUP_RESPAWN_MS, HEALTH_PICKUP_RESPAWN_MS, DROP_LIFETIME_MS, GUN_WEIGHTS, isWeapon, catOf,
 } from './shared/weapons';
 import { MapDef, MAP_IDS, getMap } from './shared/maps';
-import {
-  Mode, MAX_PLAYERS, MIN_PLAYERS, ROUND_CHOICES, TARGET_CHOICES, TEAM_NAMES,
-  BOUNDARY_DAMAGE_PER_SECOND,
-} from './shared/rules';
+import { Mode, MAX_PLAYERS, MIN_PLAYERS, ROUND_CHOICES, TARGET_CHOICES, TEAM_NAMES } from './shared/rules';
 
 const TICK_MS = FIXED_DT * 1000;
 const SNAPSHOT_EVERY = 3;          // 20 snapshots per second
 const RESPAWN_MS = 2000;
 const SPAWN_PROTECTION_MS = 2000;
-const RECONNECT_SECONDS = 90;
+const RECONNECT_SECONDS = 15;
 const ROUND_END_MS = 8000;
 const SERIES_END_MS = 12000;
-const JOIN_MESSAGE_DELAY_MS = 150;
 const MAX_HP = 100;
-const MEDKIT_HEAL = 50;
+const BOUNDARY_GRACE_MS = 1500;
+const BOUNDARY_DAMAGE_INTERVAL_MS = 1000;
+const BOUNDARY_DAMAGE = 10;
 const TURBO_MS = 6000;
 const MAX_BOMBS = 5;
 const PICKUP_RADIUS = 38;
 
-type Phase = 'play' | 'roundEnd' | 'seriesEnd';
+type Phase = 'lobby' | 'play' | 'roundEnd' | 'seriesEnd';
 interface Slot { k: WeaponKey; ammo: number; reserve: number }   // reserve -1 = unlimited (pistol)
 
 interface Player {
   id: string; name: string; body: Body; aim: number; thrust: boolean;
   dead: boolean; respawnAt: number; connected: boolean;
+  boundarySince: number; lastBoundaryDamage: number;
   queue: InputCmd[]; lastInput: InputCmd; lastSeq: number; ack: number;
   tokens: number; lastRefill: number; violations: number;
   hp: number; slots: Slot[]; cur: number;
@@ -48,7 +47,6 @@ interface Pickup {
   spawn: boolean;                                                   // true = lying on the map, false = dropped by a player
   lockUntil: number; expireAt: number; ammo?: number; reserve?: number;
 }
-interface ChatEntry { id: string; name: string; text: string; at: number }
 
 const num = (v: unknown, fallback = 0): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 const round = (v: number, d: number) => Math.round(v * 10 ** d) / 10 ** d;
@@ -74,10 +72,6 @@ export class ArenaRoom extends Room {
   private roundNo = 1;
   private phase: Phase = 'play';
   private phaseUntil = 0;
-  private isPublic = false;
-  private started = false;
-  private starting = false;
-  private nextStartAttemptAt = 0;
   private teamKills = [0, 0];
   private teamWins = [0, 0];
 
@@ -91,39 +85,37 @@ export class ArenaRoom extends Room {
   private tick = 0;
   private code = 'PUBLIC';
   private joined = 0;
-  private chatHistory: ChatEntry[] = [];
-  private lastChatAt = new Map<string, number>();
+  private hostId = '';
 
   onCreate(options: any) {
-    this.code = typeof options?.code === 'string' ? options.code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PUBLIC' : 'PUBLIC';
-    this.isPublic = this.code === 'PUBLIC';
-    this.mode = this.isPublic || options?.mode === 'teams' ? 'teams' : 'ffa';
+    this.mode = options?.mode === 'teams' ? 'teams' : 'ffa';
     const cap = MAX_PLAYERS[this.mode];
     const wanted = Math.floor(num(options?.maxPlayers, Number(process.env.MAX_PLAYERS) || cap));
-    this.maxClients = this.isPublic ? cap : clamp(wanted, MIN_PLAYERS, cap);
-    this.rounds = this.isPublic ? 1 : (ROUND_CHOICES.includes(options?.rounds) ? options.rounds : 3);
+    this.maxClients = clamp(wanted, MIN_PLAYERS, cap);
+    this.rounds = ROUND_CHOICES.includes(options?.rounds) ? options.rounds : 3;
     this.target = TARGET_CHOICES.includes(options?.target) ? options.target : 10;
-    if (this.isPublic) this.target = 10;
-    this.mapChoice = this.isPublic ? 'random' : (typeof options?.map === 'string' && MAP_IDS.includes(options.map) ? options.map : 'random');
+    this.mapChoice = typeof options?.map === 'string' && MAP_IDS.includes(options.map) ? options.map : 'random';
+    this.code = typeof options?.code === 'string' ? options.code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'PUBLIC' : 'PUBLIC';
+    if (this.code !== 'PUBLIC') {
+      this.phase = 'lobby';
+      this.roundNo = 0;
+    }
     this.map = getMap(this.mapChoice === 'random' ? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)] : this.mapChoice);
-    this.started = this.isPublic;
     this.setMetadata({ code: this.code, maxPlayers: this.maxClients, map: this.map.id, mode: this.mode });
     this.setupPickups();
 
     this.onMessage('inputs', (client, msg) => this.handleInputs(client, msg));
-    this.onMessage('chat-send', (client, msg) => this.handleChat(client, msg));
-    this.onMessage('rtc-signal', (client, msg) => this.relayVoiceSignal(client, msg));
+    this.onMessage('start', (client) => {
+      if (this.phase !== 'lobby' || client.sessionId !== this.hostId || this.players.size < MIN_PLAYERS) return;
+      this.startNextRound(Date.now());
+      this.broadcast('roomStart', { code: this.code });
+    });
     this.setSimulationInterval((dt) => this.update(dt), TICK_MS);
     console.log(`[room ${this.roomId}] created, code=${this.code}, mode=${this.mode}, rounds=${this.rounds}, target=${this.target}, map=${this.map.id}, max=${this.maxClients}`);
   }
 
-  private welcomeFor(id: string, started = this.started) {
-    return {
-      id, code: this.code, maxPlayers: this.maxClients, map: this.map.id, mode: this.mode,
-      rounds: this.rounds, target: this.target, round: this.roundNo, started,
-      players: [...this.players.values()].map((o) => ({ id: o.id, name: o.name, team: o.team })),
-      count: this.players.size,
-    };
+  private welcomeFor(id: string) {
+    return { id, code: this.code, maxPlayers: this.maxClients, map: this.map.id, mode: this.mode, rounds: this.rounds, target: this.target, round: this.roundNo, hostId: this.hostId, phase: this.phase };
   }
 
   onJoin(client: Client, options: any) {
@@ -133,17 +125,10 @@ export class ArenaRoom extends Room {
     const team = this.mode === 'teams' ? (counts[0] <= counts[1] ? 0 : 1) : -1;
     const p = this.makePlayer(client.sessionId, cleanName(options?.name, `Soldier${this.joined}`), team);
     this.players.set(client.sessionId, p);
-    const readyToStart = !this.isPublic && this.players.size >= this.maxClients;
-    setTimeout(() => {
-      void (async () => {
-        if (!this.clients.some((member) => member.sessionId === client.sessionId)) return;
-        this.sendRoster();
-        if (readyToStart) await this.startMatch();
-        client.send('welcome', this.welcomeFor(client.sessionId));
-        client.send('chat-history', this.chatHistory);
-        if (!this.started) this.sendLobby();
-      })();
-    }, JOIN_MESSAGE_DELAY_MS);
+    if (!this.hostId) this.hostId = client.sessionId;
+    client.send('welcome', this.welcomeFor(client.sessionId));
+    this.sendRoster();
+    this.sendRoomState();
   }
 
   async onLeave(client: Client, consented: boolean) {
@@ -154,18 +139,15 @@ export class ArenaRoom extends Room {
       try {
         const back = await this.allowReconnection(client, RECONNECT_SECONDS);
         p.connected = true;
-        setTimeout(() => {
-          back.send('welcome', this.welcomeFor(client.sessionId));
-          back.send('chat-history', this.chatHistory);
-          this.sendRoster();
-        }, JOIN_MESSAGE_DELAY_MS);
+        back.send('welcome', this.welcomeFor(client.sessionId));
+        this.sendRoster();
         return;
       } catch { /* did not come back in time */ }
     }
     this.players.delete(client.sessionId);
-    this.lastChatAt.delete(client.sessionId);
+    if (client.sessionId === this.hostId) this.hostId = this.players.keys().next().value ?? '';
     this.sendRoster();
-    if (!this.started) this.sendLobby();
+    this.sendRoomState();
   }
 
   onDispose() { console.log(`[room ${this.roomId}] disposed`); }
@@ -181,6 +163,7 @@ export class ArenaRoom extends Room {
     const p: Player = {
       id, name, body: { x: 0, y: 0, vx: 0, vy: 0, onGround: true }, aim: 0, thrust: false,
       dead: false, respawnAt: 0, connected: true, queue: [], lastInput: zero, lastSeq: 0, ack: 0,
+      boundarySince: 0, lastBoundaryDamage: 0,
       tokens: 60, lastRefill: Date.now(), violations: 0,
       hp: MAX_HP, slots: this.freshSlots(), cur: 0, bombs: 2, bombKind: 'grenade', turboUntil: 0,
       nextShot: 0, reloadUntil: 0, invUntil: Date.now() + SPAWN_PROTECTION_MS, pickNow: false,
@@ -196,6 +179,8 @@ export class ArenaRoom extends Room {
     p.body = { x, y, vx: 0, vy: 0, onGround: true };
     p.dead = false; p.queue.length = 0; p.ack = p.lastSeq;
     p.lastInput = { seq: p.lastSeq, dx: 0, thrust: false, aim: 0, fire: false, bomb: false, reload: false, pick: false, sel: -1 };
+    p.aim = 0; p.thrust = false; p.pickNow = false;
+    p.boundarySince = 0; p.lastBoundaryDamage = 0;
     p.hp = MAX_HP; p.slots = this.freshSlots(); p.cur = 0;
     p.bombs = 2; p.bombKind = 'grenade'; p.turboUntil = 0; p.reloadUntil = 0; p.nextShot = 0;
     p.invUntil = now + SPAWN_PROTECTION_MS;
@@ -257,10 +242,6 @@ export class ArenaRoom extends Room {
 
   // ---------- simulation ----------
   private update(deltaMs: number) {
-    if (!this.started) {
-      if (!this.isPublic && this.players.size >= this.maxClients && Date.now() >= this.nextStartAttemptAt) void this.startMatch();
-      if (!this.started) return;
-    }
     this.acc = Math.min(this.acc + deltaMs, 250);
     while (this.acc >= TICK_MS) {
       this.acc -= TICK_MS;
@@ -272,8 +253,9 @@ export class ArenaRoom extends Room {
   private get paused() { return this.phase !== 'play'; }
 
   private step(now: number) {
-    if (this.phase !== 'play' && now >= this.phaseUntil) this.startNextRound(now);
-    if (this.isPublic && this.phase === 'seriesEnd') return;
+    if (this.phase === 'lobby') return;
+    if (this.phase === 'seriesEnd') return;
+    if (this.phase === 'roundEnd' && now >= this.phaseUntil) this.startNextRound(now);
 
     for (const p of this.players.values()) {
       if (p.dead) {
@@ -296,15 +278,20 @@ export class ArenaRoom extends Room {
           if (cmd.pick) p.pickNow = true;
         }
         if (cmd.fire) this.tryFire(p, now);
-        if (outOfBounds(p.body, this.map)) {
-          p.hp = Math.max(0, p.hp - BOUNDARY_DAMAGE_PER_SECOND * FIXED_DT);
-          if (p.hp <= 0) {
-            this.kill(p, null, 'out', now);
-            break;
-          }
-        }
       }
       if (p.reloadUntil && now >= p.reloadUntil) this.finishReload(p);
+      if (outOfBounds(p.body, this.map)) {
+        if (!p.boundarySince) {
+          p.boundarySince = now;
+          p.lastBoundaryDamage = now - BOUNDARY_DAMAGE_INTERVAL_MS;
+        } else if (now - p.boundarySince >= BOUNDARY_GRACE_MS && now - p.lastBoundaryDamage >= BOUNDARY_DAMAGE_INTERVAL_MS) {
+          p.lastBoundaryDamage = now;
+          this.damage(p, BOUNDARY_DAMAGE, p.id, 'out', now);
+        }
+      } else {
+        p.boundarySince = 0;
+        p.lastBoundaryDamage = 0;
+      }
     }
     this.stepBullets(now);
     this.stepBombs(now);
@@ -314,7 +301,7 @@ export class ArenaRoom extends Room {
 
   // ---------- rounds ----------
   private checkRoundEnd(killer: Player, now: number) {
-    if (this.isPublic || this.phase !== 'play') return;
+    if (this.phase !== 'play') return;
     if (this.mode === 'ffa' && killer.kills >= this.target) this.endRound(now, killer, -1);
     else if (this.mode === 'teams' && this.teamKills[killer.team] >= this.target) this.endRound(now, undefined, killer.team);
   }
@@ -324,7 +311,7 @@ export class ArenaRoom extends Room {
     else if (winner) winner.wins++;
     const last = this.roundNo >= this.rounds;
     this.phase = last ? 'seriesEnd' : 'roundEnd';
-    this.phaseUntil = this.isPublic && last ? Number.POSITIVE_INFINITY : now + (last ? SERIES_END_MS : ROUND_END_MS);
+    this.phaseUntil = now + (last ? SERIES_END_MS : ROUND_END_MS);
 
     const list = [...this.players.values()];
     const scores = list.map((o) => ({ id: o.id, name: o.name, k: o.kills, d: o.deaths, w: o.wins, t: o.team })).sort((a, b) => b.k - a.k || a.d - b.d);
@@ -360,6 +347,17 @@ export class ArenaRoom extends Room {
     this.setupPickups();
     this.players.forEach((p) => { p.kills = 0; p.deaths = 0; this.respawn(p, now); });
     this.broadcast('event', { type: 'round', n: this.roundNo, rounds: this.rounds, map: this.map.id, mode: this.mode, target: this.target });
+  }
+
+  private sendRoomState() {
+    if (this.code === 'PUBLIC') return;
+    this.broadcast('roomState', {
+      code: this.code,
+      hostId: this.hostId,
+      maxPlayers: this.maxClients,
+      phase: this.phase,
+      players: [...this.players.values()].map((p) => ({ id: p.id, name: p.name, team: p.team })),
+    });
   }
 
   // ---------- weapons ----------
@@ -524,8 +522,9 @@ export class ArenaRoom extends Room {
 
   private randomType(cat: PickupCat): PickupType {
     if (cat === 'turbo') return 'turbo';
-    if (cat === 'medkit') return 'medkit';
     if (cat === 'bomb') return Math.random() < 0.5 ? 'grenade' : 'pineapple';
+    if (cat === 'health') return 'medkit';
+    if (cat === 'ammo') return 'ammo';
     const total = GUN_WEIGHTS.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;
     for (const [k, w] of GUN_WEIGHTS) { r -= w; if (r <= 0) return k; }
@@ -577,7 +576,16 @@ export class ArenaRoom extends Room {
   // Returns true when the player took the item.
   private collect(p: Player, pk: Pickup, now: number): boolean {
     const t = pk.type;
-    if (isWeapon(t)) {
+    if (t === 'medkit') {
+      if (p.hp >= MAX_HP) return false;
+      p.hp = Math.min(MAX_HP, p.hp + 40);
+    } else if (t === 'ammo') {
+      const ammoSlot = (p.slots[p.cur] && !WEAPONS[p.slots[p.cur].k].infinite && WEAPONS[p.slots[p.cur].k].kind !== 'melee'
+        ? p.slots[p.cur]
+        : p.slots.find((s) => !WEAPONS[s.k].infinite && WEAPONS[s.k].kind !== 'melee'));
+      if (!ammoSlot) return false;
+      ammoSlot.reserve += 100;
+    } else if (isWeapon(t)) {
       const def = WEAPONS[t];
       const have = p.slots.find((s) => s.k === t);
       if (have) {                                         // same gun: just refill it
@@ -593,14 +601,16 @@ export class ArenaRoom extends Room {
         p.slots[idx] = { k: t, ammo: pk.ammo ?? def.mag, reserve: pk.reserve ?? def.reserve };
         p.cur = idx; p.reloadUntil = 0; p.nextShot = now + 250;
       } else return false;
-    } else if (t === 'medkit') {
-      if (p.hp >= MAX_HP) return false;
-      p.hp = Math.min(MAX_HP, p.hp + MEDKIT_HEAL);
     } else if (t === 'turbo') p.turboUntil = now + TURBO_MS;
     else { p.bombs = Math.min(MAX_BOMBS, p.bombs + 2); p.bombKind = t; }
 
     this.pickups.delete(pk.id);
-    if (pk.spawn) this.respawnQueue.push({ cat: catOf(t), at: now + PICKUP_RESPAWN_MS, avoidX: pk.x, avoidY: pk.y });
+    if (pk.spawn) this.respawnQueue.push({
+      cat: catOf(t),
+      at: now + (t === 'medkit' ? HEALTH_PICKUP_RESPAWN_MS : PICKUP_RESPAWN_MS),
+      avoidX: pk.x,
+      avoidY: pk.y,
+    });
     return true;
   }
 
@@ -622,92 +632,6 @@ export class ArenaRoom extends Room {
   }
 
   private sendRoster() {
-    const players = [...this.players.values()].map((o) => ({ id: o.id, name: o.name, team: o.team }));
-    this.broadcast('roster', { players });
-  }
-
-  private sendLobby() {
-    const players = [...this.players.values()].map((o) => ({ id: o.id, name: o.name, team: o.team }));
-    this.broadcast('lobby', {
-      players, count: players.length, maxPlayers: this.maxClients, started: this.started, isPublic: this.isPublic,
-    });
-  }
-
-  private handleChat(client: Client, message: any) {
-    const player = this.players.get(client.sessionId);
-    if (!player) return;
-    if (typeof message?.text !== 'string') {
-      client.send('chat-error', { message: 'Message must be plain text.' });
-      return;
-    }
-    const text = message.text.replace(/[\u0000-\u001f\u007f]/g, ' ').trim();
-    if (!text || text.length > 240) {
-      client.send('chat-error', { message: 'Messages must be between 1 and 240 characters.' });
-      return;
-    }
-    const now = Date.now();
-    if (now - (this.lastChatAt.get(client.sessionId) ?? 0) < 600) {
-      client.send('chat-error', { message: 'Please wait before sending another message.' });
-      return;
-    }
-    this.lastChatAt.set(client.sessionId, now);
-    const entry = { id: player.id, name: player.name, text, at: now };
-    this.chatHistory.push(entry);
-    if (this.chatHistory.length > 50) this.chatHistory.shift();
-    this.broadcast('chat', entry);
-  }
-
-  private relayVoiceSignal(client: Client, message: any) {
-    const sender = this.players.get(client.sessionId);
-    const recipientId = typeof message?.to === 'string' ? message.to : '';
-    const recipient = this.players.get(recipientId);
-    const targetClient = this.clients.find((member) => member.sessionId === recipientId);
-    if (!this.started || this.mode !== 'teams' || !sender || !recipient || !targetClient ||
-      sender.team < 0 || sender.team !== recipient.team || sender.id === recipient.id) {
-      if (sender) client.send('rtc-error', { message: 'Team voice signaling is only allowed between teammates in a live team match.' });
-      return;
-    }
-
-    if (message.description !== undefined) {
-      const description = message.description;
-      if (!description || !['offer', 'answer'].includes(description.type) ||
-        typeof description.sdp !== 'string' || description.sdp.length > 20000) {
-        client.send('rtc-error', { message: 'Invalid voice connection description.' });
-        return;
-      }
-      targetClient.send('rtc-signal', { from: sender.id, description });
-    } else if (message.candidate !== undefined) {
-      const candidate = message.candidate;
-      if (!candidate || typeof candidate.candidate !== 'string' || candidate.candidate.length > 3000 ||
-        (candidate.sdpMid !== null && candidate.sdpMid !== undefined &&
-          (typeof candidate.sdpMid !== 'string' || candidate.sdpMid.length > 256)) ||
-        (candidate.sdpMLineIndex !== null && candidate.sdpMLineIndex !== undefined &&
-          (typeof candidate.sdpMLineIndex !== 'number' || !Number.isInteger(candidate.sdpMLineIndex)))) {
-        client.send('rtc-error', { message: 'Invalid voice connection candidate.' });
-        return;
-      }
-      targetClient.send('rtc-signal', { from: sender.id, candidate });
-    } else {
-      client.send('rtc-error', { message: 'Empty voice connection signal.' });
-    }
-  }
-
-  private async startMatch() {
-    if (this.started || this.starting) return;
-    this.starting = true;
-    try {
-      await this.lock();
-    } catch (error) {
-      this.starting = false;
-      this.nextStartAttemptAt = Date.now() + 1000;
-      console.error(`[room ${this.roomId}] could not lock before starting`, error);
-      return;
-    }
-    this.starting = false;
-    this.started = true;
-    setTimeout(() => {
-      this.sendLobby();
-      this.broadcast('start', {});
-    }, 0);
+    this.broadcast('roster', { players: [...this.players.values()].map((o) => ({ id: o.id, name: o.name, team: o.team })) });
   }
 }

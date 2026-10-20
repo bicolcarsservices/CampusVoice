@@ -12,8 +12,7 @@
   <title>Mini Soldier Arena</title>
   <style>
     :root { --bg: #0b1a10; --panel: #1b2733; --text: #f2f6fa; --muted: #9db0c1; --accent: #3fc24f; --danger: #ff6b6b; }
-    html, body { margin: 0; width: 100%; height: 100%; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-    @supports (height: 100dvh) { html, body { height: 100dvh; min-height: 100dvh; } }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     #game { position: fixed; inset: 0; }
 
     /* loading screen */
@@ -26,20 +25,9 @@
     #pct { width: 13%; text-align: right; font-weight: 800; color: #ffc93c; font-size: clamp(11px, 1.9vw, 30px); text-shadow: 0 2px 0 #000a; }
     #loadmsg { position: absolute; left: 0; right: 0; top: 93.2%; text-align: center; color: #fff; font-size: clamp(10px, 1.5vw, 22px); text-shadow: 0 2px 4px #000; }
 
-    /* match loading */
-    #matchLoading { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(8, 14, 10, 0.96); }
-    #matchLoading.active { display: flex; }
-    #matchLoadingPanel { width: min(92vw, 440px); text-align: center; }
-    #matchLoadingTitle { margin-bottom: 14px; font-size: clamp(20px, 4vw, 30px); font-weight: 800; }
-    #matchBar { height: 20px; padding: 3px; border: 1px solid #5b5b5b; border-radius: 99px; background: #202820; }
-    #matchFill { width: 0; height: 100%; border-radius: 99px; background: linear-gradient(#ffe082, #ffa000); transition: width 0.12s linear; }
-    #matchPct { margin-top: 8px; color: #ffc93c; font-weight: 800; }
-    #matchMessage { margin-top: 8px; color: var(--muted); }
-
     /* lobby */
-    #lobby { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8, 14, 10, 0.86); z-index: 10; overflow: hidden; }
-    .panel { background: var(--panel); border-radius: 14px; padding: 18px 20px; width: min(94vw, 400px); max-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow: auto; box-sizing: border-box; }
-    @supports (height: 100dvh) { .panel { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); } }
+    #lobby { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8, 14, 10, 0.86); z-index: 10; overflow: auto; }
+    .panel { background: var(--panel); border-radius: 14px; padding: 18px 20px; width: min(94vw, 400px); max-height: 96vh; overflow: auto; box-sizing: border-box; }
     h1 { margin: 0 0 10px; font-size: 22px; text-align: center; }
     input, select, button { font: inherit; border-radius: 8px; border: 0; padding: 10px 12px; box-sizing: border-box; }
     input, select { width: 100%; background: #0d141b; color: var(--text); margin-bottom: 8px; }
@@ -51,140 +39,39 @@
     .row { display: flex; gap: 8px; } .row > * { flex: 1; min-width: 0; }
     #msg { min-height: 18px; margin: 2px 0 0; color: var(--danger); font-size: 14px; text-align: center; }
     #srv { margin: 4px 0 0; color: var(--muted); font-size: 11px; text-align: center; word-break: break-all; }
-    #lobbyPanel.waiting-mode { width: min(96vw, 1040px); padding: clamp(14px, 3vw, 28px); background: linear-gradient(145deg, #111a30, #1b2733 65%, #111a30); border: 1px solid #66708a; box-shadow: 0 20px 70px #000b; overflow: hidden; }
-    #lobbyPanel.waiting-mode > h1 { display: none; }
-    #waiting { display: none; text-align: center; }
-    #waitingTop { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px 20px; margin-bottom: 18px; text-align: left; }
-    #waitingTitle { margin: 0; font-size: clamp(20px, 4vw, 30px); letter-spacing: 1px; }
-    #waitingHint { margin-top: 3px; color: var(--muted); font-size: 13px; }
-    #roomTools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-    #roomCode { padding: 8px 12px; border: 1px solid #52617c; border-radius: 7px; background: #0d141b; color: #ffc93c; font: 800 20px monospace; letter-spacing: 3px; }
-    #roomTools button { width: auto; margin: 0; }
-    #roomCount { grid-column: 1 / -1; color: #d5dceb; font-weight: 700; }
-    #teamBattle { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: clamp(8px, 2vw, 24px); }
-    .teamCard { min-width: 0; padding: clamp(9px, 2vw, 18px); border: 1px solid; border-radius: 12px; text-align: left; }
-    .teamCard.blue { border-color: #4b8dff; background: linear-gradient(145deg, #183769c9, #101c32e8); }
-    .teamCard.red { border-color: #ff6472; background: linear-gradient(145deg, #6b2334c9, #32151fe8); }
-    .teamTitle { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: clamp(13px, 2vw, 18px); font-weight: 900; letter-spacing: 1px; }
-    .blue .teamTitle { color: #8fbcff; } .red .teamTitle { color: #ff9ea8; }
-    .teamSlots { display: grid; gap: 7px; }
-    .playerSlot { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 5px 8px; border: 1px solid #ffffff22; border-radius: 8px; background: #090e1b99; box-sizing: border-box; }
-    .playerSlot.empty { border-style: dashed; color: #aab3c4a6; }
-    .playerAvatar { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; overflow: hidden; border: 1px solid #ffffff55; border-radius: 7px; background: #27344c; color: white; font-size: 13px; font-weight: 900; }
-    .playerAvatar img { width: 100%; height: 100%; object-fit: cover; }
-    .playerName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(12px, 1.8vw, 15px); font-weight: 700; }
-    #versus { align-self: center; color: #f5e7c4; font: italic 900 clamp(22px, 5vw, 46px) Georgia, serif; text-shadow: 0 3px 12px #000; }
-    #ffaRoster { display: none; max-width: 600px; margin: 0 auto; padding: 14px; border: 1px solid #8792ac; border-radius: 12px; background: #111a30; text-align: left; }
-    #ffaRoster .teamTitle { color: #f4d895; }
-    #roomStatus { min-height: 20px; margin: 14px 0 8px; color: #d5dceb; }
-    #cancelRoom { width: min(100%, 300px); margin: 0 auto; background: #843a46; color: white; }
-    .chatbox { min-width: 0; border: 1px solid #53617a; border-radius: 10px; background: #0b1120eF; color: var(--text); text-align: left; }
-    .chatHeading { margin: 0; padding: 9px 12px; border-bottom: 1px solid #ffffff22; font-size: 14px; letter-spacing: .5px; }
-    .chatLog { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; margin: 0; padding: 9px 12px; list-style: none; }
-    .chatLog li { overflow-wrap: anywhere; font-size: 13px; line-height: 1.35; }
-    .chatName { color: #ffc96a; font-weight: 800; }
-    .chatName.system { color: #ff9ea8; }
-    .chatForm { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #ffffff22; }
-    .chatForm input { min-width: 0; margin: 0; user-select: text; -webkit-user-select: text; touch-action: auto; }
-    .chatForm button { flex: 0 0 auto; width: auto; margin: 0; padding-inline: 14px; }
-    #roomChat { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 13; display: none; flex-direction: column; width: min(420px, calc(100vw - 24px)); max-height: min(48vh, 300px); transform: translateX(-50%); box-shadow: 0 8px 30px #0009; }
-    #waiting.room-chat-open #roomChat { display: flex; }
-    #roomChat .chatLog { flex: 1; min-height: 0; max-height: min(30vh, 190px); }
-    #gameDock { position: fixed; right: calc(8px + env(safe-area-inset-right, 0px)); top: 50%; z-index: 9; display: none; flex-direction: column; gap: 7px; transform: translateY(-50%); }
-    body.ingame #gameDock { display: flex; }
-    #gameDock button { width: 44px; height: 44px; margin: 0; padding: 0; border: 1px solid #ffffff38; border-radius: 13px; background: #111a30eF; color: #f2f6fa; font-size: 12px; font-weight: 800; box-shadow: 0 3px 12px #0008; touch-action: manipulation; }
-    #gameDock #chatToggle { font-size: 11px; }
-    #gameDock #voiceToggle { background: #25324aef; }
-    #gameDock #voiceToggle[aria-pressed="true"] { background: #a83242; }
-    #gameChat { position: fixed; right: calc(62px + env(safe-area-inset-right, 0px)); top: 50%; z-index: 8; display: none; flex-direction: column; width: min(340px, calc(100vw - 78px)); height: min(360px, 48vh); transform: translateY(-50%); box-shadow: 0 8px 30px #0009; }
-    body.ingame.chat-open #gameChat { display: flex; }
-    #gameChat .chatLog { flex: 1; }
-    #voiceStatus { position: fixed; right: calc(62px + env(safe-area-inset-right, 0px)); top: calc(50% + min(220px, 27vh)); z-index: 7; max-width: min(340px, calc(100vw - 78px)); padding: 7px 10px; border-radius: 7px; background: #101825eF; color: #e5ebf5; font-size: 12px; pointer-events: none; }
-    #lobbyChatToggle { position: fixed; right: calc(10px + env(safe-area-inset-right, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 12; display: none; width: auto; min-width: 46px; min-height: 46px; margin: 0; padding: 0 12px; border: 1px solid #ffffff38; border-radius: 15px; background: #111a30ef; color: white; box-shadow: 0 4px 14px #0008; touch-action: manipulation; }
-    body.room-waiting #lobbyChatToggle { display: block; }
-    @media (max-width: 560px) {
-      #waitingTop { grid-template-columns: 1fr; text-align: center; }
-      #roomTools { justify-content: center; }
-      #teamBattle { gap: 6px; }
-      .teamCard { padding: 7px; }
-      .playerSlot { gap: 5px; min-height: 38px; padding: 4px; }
-      .playerAvatar { flex-basis: 27px; width: 27px; height: 27px; }
-      #roomCount { font-size: 13px; }
-      #bar2 { left: 8px; right: 8px; justify-content: flex-end; }
-      #bar2 button { padding: 6px 8px; font-size: 11px; }
-      #gameDock { right: calc(5px + env(safe-area-inset-right, 0px)); gap: 5px; }
-      #gameDock button { width: 40px; height: 40px; border-radius: 12px; }
-      #gameChat { right: calc(52px + env(safe-area-inset-right, 0px)); width: min(320px, calc(100vw - 64px)); height: min(300px, 52vh); }
-      #voiceStatus { right: calc(52px + env(safe-area-inset-right, 0px)); top: auto; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
-    }
-    @media (orientation: landscape) and (max-height: 500px) {
-      #lobbyPanel:not(.waiting-mode) { display: flex; flex-direction: column; width: min(96vw, 900px); max-height: 100vh; padding: 7px 12px; overflow: hidden; }
-      @supports (height: 100dvh) { #lobbyPanel:not(.waiting-mode) { max-height: 100dvh; } }
-      #lobbyPanel:not(.waiting-mode) > h1 { display: none; }
-      #lobbyPanel:not(.waiting-mode) #menu { display: grid !important; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "nameLabel mode" "nameInput mode" "quick rounds" "mapLabel rounds" "mapInput create" "codeLabel codeLabel" "codeRow codeRow" "message message" "server server"; align-content: center; align-items: center; gap: 2px 12px; }
-      #menu > label:nth-child(1) { grid-area: nameLabel; }
-      #name { grid-area: nameInput; }
-      #quick { grid-area: quick; }
-      #menu > hr { display: none; }
-      #menu > .row:nth-of-type(1) { grid-area: mode; }
-      #menu > .row:nth-of-type(2) { grid-area: rounds; }
-      #menu > label:nth-of-type(2) { grid-area: mapLabel; }
-      #map { grid-area: mapInput; }
-      #create { grid-area: create; }
-      #menu > label:nth-of-type(3) { grid-area: codeLabel; }
-      #menu > .row:nth-of-type(3) { grid-area: codeRow; }
-      #msg { grid-area: message; }
-      #srv { grid-area: server; }
-      #menu input, #menu select { margin-bottom: 2px; padding: 6px 8px; }
-      #menu button { margin-bottom: 2px; padding: 6px 8px; }
-      #menu label { margin: 0; }
-      #menu .row { gap: 5px; }
-      #lobbyPanel.waiting-mode { max-height: 100vh; padding: 7px 12px; }
-      @supports (height: 100dvh) { #lobbyPanel.waiting-mode { max-height: 100dvh; } }
-      #waitingTop { gap: 4px 12px; margin-bottom: 5px; }
-      #waitingHint { font-size: 11px; }
-      #roomCode { padding: 5px 8px; font-size: 16px; }
-      #roomCount { font-size: 12px; }
-      #teamBattle { gap: 8px; }
-      .teamCard { padding: 5px; }
-      .teamTitle { margin-bottom: 4px; font-size: 12px; }
-      .teamSlots { gap: 3px; }
-      .playerSlot { min-height: 22px; gap: 4px; padding: 1px 4px; }
-      .playerAvatar { flex-basis: 16px; width: 16px; height: 16px; font-size: 9px; }
-      .playerName { font-size: 10px; line-height: 12px; }
-      #roomStatus { min-height: 16px; margin: 5px 0 3px; font-size: 12px; }
-      #cancelRoom { min-height: 32px; margin-bottom: 0; padding: 6px 10px; }
-      #ffaRoster { padding: 7px; }
-      #ffaRoster .teamSlots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
+
+    #roomLobby, #settingsPanel { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; overflow: auto; padding: 16px; box-sizing: border-box; background: rgba(8, 14, 10, 0.94); }
+    .modal-card { width: min(94vw, 520px); max-height: 94vh; overflow: auto; padding: 20px; border-radius: 14px; background: var(--panel); box-sizing: border-box; }
+    .modal-card h2 { margin: 0 0 10px; text-align: center; font-size: 22px; }
+    .modal-card p { color: var(--muted); text-align: center; }
+    #roomPlayers { margin: 12px 0; padding: 0; list-style: none; }
+    #roomPlayers li { padding: 8px 10px; margin-bottom: 5px; border-radius: 8px; background: #0d141b; }
+    #roomCodeDisplay { color: #ffe082; font-size: 24px; font-weight: 800; letter-spacing: 3px; }
+    .control-preview { position: relative; width: min(88vw, 760px); aspect-ratio: 16 / 9; margin: 12px auto; border: 2px solid #566778; border-radius: 12px; overflow: hidden; background: linear-gradient(180deg, #233d4b, #52684c 72%, #34432f 72%); touch-action: none; }
+    .control-preview::after { content: 'DRAG CONTROLS TO MOVE THEM'; position: absolute; top: 4%; left: 0; width: 100%; text-align: center; color: #fff; font-size: clamp(9px, 1.7vw, 13px); text-shadow: 0 1px 3px #000; pointer-events: none; }
+    .preview-control { position: absolute; left: 0; top: 0; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); color: #fff; font-weight: 800; font-size: clamp(8px, 1.5vw, 12px); text-shadow: 0 1px 3px #000; cursor: grab; touch-action: none; }
+    .preview-control.dragging { cursor: grabbing; }
+    .preview-stick { width: 11%; aspect-ratio: 1; border: 2px solid #ffffffa8; border-radius: 50%; background: #ffffff35; }
+    .preview-stick::after { content: ''; width: 34%; aspect-ratio: 1; border-radius: 50%; background: #ffffffa8; }
+    .preview-button { width: 7%; aspect-ratio: 1; border: 2px solid #ffffffa8; border-radius: 50%; background: #142638bb; }
+    .preview-slots { width: 24%; height: 12%; border: 2px solid #ffe082; border-radius: 8px; background: #142638bb; }
+    #settingsPanel .modal-card { width: min(96vw, 820px); }
+    .settings-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .settings-actions button, .room-actions button { width: auto; min-width: 112px; }
 
     /* buttons shown while playing */
     #bar2 { position: fixed; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 5; display: none; gap: 6px; }
     body.ingame #bar2 { display: flex; }
     #bar2 button { width: auto; margin: 0; padding: 7px 11px; font-size: 13px; background: rgba(45, 65, 86, 0.85); color: var(--text); }
-    #controlSettings { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; padding: 14px; background: #000b; }
-    #controlSettings.open { display: flex; }
-    #controlSettingsPanel { width: min(94vw, 540px); max-height: 90vh; overflow: auto; padding: 18px; border: 1px solid #59677b; border-radius: 16px; background: #111a30; box-shadow: 0 18px 60px #000b; touch-action: pan-y; }
-    #controlSettingsPanel h2 { margin: 0 0 6px; font-size: 22px; }
-    #controlSettingsPanel p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
-    .settingsRow { display: grid; grid-template-columns: 1fr minmax(100px, 180px); align-items: center; gap: 12px; margin: 9px 0; color: var(--text); font-size: 13px; }
-    .settingsRow input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
-    #keyBindings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-    .keyBinding { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px; border: 1px solid #ffffff24; border-radius: 8px; color: var(--muted); font-size: 12px; }
-    .keyBinding button { width: auto; min-width: 55px; margin: 0; padding: 6px 9px; background: #2d4156; color: white; font-family: monospace; }
-    .settingsActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
-    .settingsActions button { min-width: 0; margin: 0; padding: 8px 5px; font-size: 12px; }
-    #arrangeControls { grid-column: 1 / -1; }
-    #layoutEditBar { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 31; display: none; width: min(94vw, 420px); padding: 9px 12px; border: 1px solid #ffdf6e; border-radius: 12px; background: #111a30ee; color: white; text-align: center; transform: translateX(-50%); pointer-events: none; }
-    #layoutEditBar button { width: auto; margin: 0 0 0 8px; padding: 6px 12px; pointer-events: auto; }
-    body.editing-controls #layoutEditBar { display: block; }
-    @media (max-width: 480px) { #keyBindings { grid-template-columns: 1fr; } .settingsRow { grid-template-columns: 1fr minmax(100px, 42%); } }
+    #toast { position: fixed; left: 50%; bottom: calc(54px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20; display: none; max-width: 90vw; padding: 10px 14px; border-radius: 10px; background: rgba(0, 0, 0, 0.86); color: var(--text); text-align: center; font-size: 14px; }
     #fshint { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 6; display: none; background: rgba(0,0,0,0.7); color: #fff; padding: 8px 14px; border-radius: 99px; font-size: 14px; }
     body.ingame.needfs #fshint { display: block; }
 
     /* ask the player to turn the phone */
     #rotate { position: fixed; inset: 0; z-index: 40; display: none; background: #0b1a10; color: #fff; align-items: center; justify-content: center; flex-direction: column; text-align: center; font-size: 20px; }
     #rotate .ph { font-size: 64px; transform: rotate(90deg); margin-bottom: 14px; }
+    #rotate.active { display: flex; }
+    #rotate button { width: auto; margin: 18px 12px 0; }
     @media (orientation: portrait) and (pointer: coarse) { body.ingame #rotate { display: flex; } }
   </style>
 </head>
@@ -197,117 +84,73 @@
       <div id="loadmsg"></div>
     </div>
   </div>
-  <div id="matchLoading" role="status" aria-live="polite">
-    <div id="matchLoadingPanel">
-      <div id="matchLoadingTitle">Loading match...</div>
-      <div id="matchBar"><div id="matchFill"></div></div>
-      <div id="matchPct">0%</div>
-      <div id="matchMessage">Preparing the arena</div>
-    </div>
-  </div>
 
   <div id="fshint">Tap here for full screen</div>
-  <div id="bar2"><button id="mute">Sound: On</button><button id="settings">Settings</button><button id="fs">Full screen</button><button id="leave">Leave</button></div>
-  <section id="controlSettings" aria-label="Game controls settings">
-    <div id="controlSettingsPanel">
-      <h2>Controls & settings</h2>
-      <p>Your layout and key bindings are saved on this device.</p>
-      <label class="settingsRow" for="controlSize"><span>Touch control size</span><input id="controlSize" type="range" min="0.65" max="1.5" step="0.05" /></label>
-      <label class="settingsRow" for="controlOpacity"><span>Touch control opacity</span><input id="controlOpacity" type="range" min="0.25" max="1" step="0.05" /></label>
-      <h3>Keyboard bindings</h3>
-      <div id="keyBindings"></div>
-      <div class="settingsActions">
-        <button id="arrangeControls" class="alt">Arrange touch controls</button>
-        <button id="resetControls" class="alt">Reset defaults</button>
+  <div id="bar2"><button id="mute">Sound: On</button><button id="fs">Full screen</button><button id="controls">Settings</button><button id="copyCode">Copy Code</button><button id="share">Invite</button><button id="leave">Leave</button></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="rotate"><div class="ph">&#128241;</div><div>Turn your phone sideways<br />(landscape) before entering the match</div><button id="rotateFull">Try landscape mode</button></div>
+
+  <div id="lobby">
+    <div class="panel">
+      <h1>Mini Soldier Arena</h1>
+      <label for="name">Your name</label>
+      <input id="name" maxlength="14" placeholder="Soldier" autocomplete="off" />
+      <button id="settings">Settings</button>
+      <button id="quick">PLAY</button>
+      <hr />
+      <div class="row">
+        <div><label for="mode">Mode</label><select id="mode"></select></div>
+        <div><label for="max">Players</label><select id="max"></select></div>
+      </div>
+      <div class="row">
+        <div><label for="rounds">Rounds (up to 7)</label><select id="rounds"></select></div>
+        <div><label for="target">Kills to win a round</label><select id="target"></select></div>
+      </div>
+      <label for="map">Map</label>
+      <select id="map"></select>
+      <button id="create" class="alt">Multiplayer</button>
+      <label for="code">Have a room code?</label>
+      <div class="row">
+        <input id="code" maxlength="6" placeholder="CODE" autocomplete="off" style="text-transform: uppercase" />
+        <button id="join" class="alt">Join</button>
+      </div>
+      <p id="msg"></p>
+      <p id="srv"></p>
+    </div>
+  </div>
+  <div id="roomLobby">
+    <div class="modal-card">
+      <h2>Multiplayer Lobby</h2>
+      <p>Room code<br /><span id="roomCodeDisplay"></span></p>
+      <p id="roomStatus">Waiting for players...</p>
+      <ul id="roomPlayers"></ul>
+      <div class="room-actions row">
+        <button id="roomCopyCode" class="alt">Copy Code</button>
+        <button id="roomInvite" class="alt">Invite</button>
+      </div>
+      <button id="roomSettings" class="alt">Settings</button>
+      <button id="roomStart">Start Game</button>
+      <button id="roomLeave" class="alt">Leave Lobby</button>
+    </div>
+  </div>
+  <div id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal-card">
+      <h2 id="settingsTitle">Control Settings</h2>
+      <p>Drag any control to a comfortable position. Your attack joystick aims and fires while held.</p>
+      <div id="controlPreview" class="control-preview" aria-label="Draggable control layout preview">
+        <div class="preview-control preview-stick" data-control="move" aria-label="Move joystick"></div>
+        <div class="preview-control preview-stick" data-control="aim" aria-label="Attack and fire joystick"></div>
+        <div class="preview-control preview-button" data-control="bomb">Bomb</div>
+        <div class="preview-control preview-button" data-control="reload">Reload</div>
+        <div class="preview-control preview-button" data-control="pick">Pick up</div>
+        <div class="preview-control preview-slots" data-control="slots">Weapons</div>
+      </div>
+      <div class="settings-actions">
+        <button id="resetSettings" class="alt">Reset Controls</button>
         <button id="closeSettings">Done</button>
       </div>
     </div>
-  </section>
-  <div id="layoutEditBar">Drag each control to move it. <button id="finishLayout">Done</button></div>
-  <div id="gameDock" aria-label="Chat and voice controls">
-    <button id="chatToggle" aria-label="Open chat" aria-expanded="false" title="Open room chat">Chat</button>
-    <button id="voiceToggle" aria-label="Microphone off" aria-pressed="false" disabled title="Team voice">Mic</button>
   </div>
-  <section id="gameChat" class="chatbox" aria-label="Match chat">
-    <h3 class="chatHeading">Room chat</h3>
-    <ol class="chatLog" data-chat-log></ol>
-    <form class="chatForm" data-chat-form>
-      <input data-chat-input maxlength="240" autocomplete="off" placeholder="Type a message..." aria-label="Chat message" />
-      <button type="submit">Send</button>
-    </form>
-  </section>
-  <div id="voiceStatus" hidden></div>
-  <div id="rotate"><div class="ph">&#128241;</div>Turn your phone sideways<br />(landscape) to play</div>
-
-  <div id="lobby">
-    <div id="lobbyPanel" class="panel">
-      <h1>Mini Soldier Arena</h1>
-      <div id="menu">
-        <label for="name">Your name</label>
-        <input id="name" maxlength="14" placeholder="Soldier" autocomplete="off" />
-        <button id="quick">PLAY</button>
-        <hr />
-        <div class="row">
-          <div><label for="mode">Mode</label><select id="mode"></select></div>
-          <div><label for="max">Players</label><select id="max"></select></div>
-        </div>
-        <div class="row">
-          <div><label for="rounds">Rounds</label><select id="rounds"></select></div>
-          <div><label for="target">Kills to win a round</label><select id="target"></select></div>
-        </div>
-        <label for="map">Map</label>
-        <select id="map"></select>
-        <button id="create" class="alt">Multiplayer</button>
-        <label for="code">Have a room code?</label>
-        <div class="row">
-          <input id="code" maxlength="8" placeholder="CODE" autocomplete="off" style="text-transform: uppercase" />
-          <button id="join" class="alt">Join</button>
-        </div>
-        <p id="msg"></p>
-        <p id="srv"></p>
-      </div>
-      <div id="waiting">
-        <div id="waitingTop">
-          <div>
-            <h2 id="waitingTitle">Lobby</h2>
-            <div id="waitingHint">Share this code with your players.</div>
-          </div>
-          <div id="roomTools">
-            <div id="roomCode"></div>
-            <button id="copyCode" class="alt">Copy code</button>
-            <button id="shareRoom" class="alt">Share link</button>
-          </div>
-          <div id="roomCount"></div>
-        </div>
-        <div id="teamBattle">
-          <section id="blueTeam" class="teamCard blue">
-            <div class="teamTitle"><span>BLUE TEAM</span><span class="teamCount"></span></div>
-            <div class="teamSlots"></div>
-          </section>
-          <div id="versus">VS</div>
-          <section id="redTeam" class="teamCard red">
-            <div class="teamTitle"><span>RED TEAM</span><span class="teamCount"></span></div>
-            <div class="teamSlots"></div>
-          </section>
-        </div>
-        <section id="ffaRoster">
-          <div class="teamTitle"><span>PLAYERS</span><span class="teamCount"></span></div>
-          <div class="teamSlots"></div>
-        </section>
-        <p id="roomStatus">Waiting for players...</p>
-        <button id="cancelRoom" class="alt">Leave lobby</button>
-        <section id="roomChat" class="chatbox" aria-label="Lobby chat">
-          <h3 class="chatHeading">Room chat</h3>
-          <ol class="chatLog" data-chat-log></ol>
-          <form class="chatForm" data-chat-form>
-            <input data-chat-input maxlength="240" autocomplete="off" placeholder="Type a message..." aria-label="Chat message" />
-            <button type="submit">Send</button>
-          </form>
-        </section>
-      </div>
-    </div>
-  </div>
-  <button id="lobbyChatToggle" aria-label="Open room chat" aria-expanded="false" title="Open room chat">Chat</button>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

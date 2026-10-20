@@ -4,72 +4,60 @@ Online 2D jetpack shooter. Phaser 3 + TypeScript + Vite (game) and Node.js + Col
 
     server/   multiplayer server (port 2567)      client/   the game (port 5173)
 
-## Deploy with the CampusVoice Render Blueprint
+## CampusVoice integration and deployment
 
-This game is included in the CampusVoice repository's root `render.yaml` as two Render services:
+Mini Soldier Arena is the fourth game in the CampusVoice games catalog and is hosted separately from the Next.js app. The root `render.yaml` defines:
 
 - `mini-soldier-arena-server`: Colyseus multiplayer server with a `/health` endpoint.
-- `mini-soldier-arena-client`: Vite static site; its `VITE_SERVER_URL` is set in the Blueprint to the public secure WebSocket URL of the server.
+- `mini-soldier-arena-client`: Vite static site configured to connect securely to the server.
 
-In Render, open the CampusVoice Blueprint and sync/deploy the latest repository changes. After the client static site is live, copy its HTTPS URL and set `MINI_SOLDIER_ARENA_URL` to that URL in the CampusVoice web app's hosting environment (for example, Vercel if that is where the main app is deployed). Redeploy the CampusVoice web app after setting it.
+Sync and deploy the CampusVoice Blueprint in Render. Confirm the server responds at `/health`, then set `MINI_SOLDIER_ARENA_URL` in the CampusVoice web app's hosting environment to the deployed client URL (normally `https://mini-soldier-arena-client.onrender.com`) and redeploy the web app. The game page also defaults to that Render URL in production; use the environment variable if the service has a different URL.
 
-The first Render Blueprint sync may prompt for the existing Campus Doodle service's secret environment variables. Keep their current values; the Arena services do not need additional secrets.
+The first Blueprint sync may prompt for the existing Campus Doodle service's secrets. Keep their current values; Mini Soldier Arena does not require additional secrets.
 
-## Run on your computer (two terminals)
+## Run locally
 
-    cd services/mini-soldier-arena/server
-    npm install
-    npm run dev
+From the CampusVoice root, start the server and client in separate terminals:
 
-    cd services/mini-soldier-arena/client
-    npm install
-    npm run dev
+    npm run game:mini-soldier-arena:server
+    npm run game:mini-soldier-arena:client
 
-Open the Vite URL printed in the client terminal (use a second window, or an incognito window, for a second player).
+Then open `/games/mini-soldier-arena` in the local CampusVoice app. On a touch device, the game requests fullscreen and landscape on the first tap; if the browser cannot lock orientation, turn the phone sideways before the match starts. For deployment details, read **DEPLOY.md**.
 
 ## How the game works
 
-- Open the game: loading screen, then the menu. **PLAY** enters an always-open public team arena immediately; there is no matchmaking wait or waiting lobby.
-  Other players can join the same arena at any time (up to 10 players). Players respawn after being eliminated, so the fight continues.
-- Quick Play is a continuous team battle on a random map. Private multiplayer rooms still wait for their selected player count and use the configured rounds.
-- **Multiplayer** creates a private room. Share its code and the match starts after the selected number of players have joined.
-  You can also join an existing private room with its code.
-- **Room chat** is available in the waiting lobby and during matches by opening the **Chat** control. It starts collapsed; messages are room-only and limited to 240 characters.
-- **Team voice chat** is available in team matches from the **Mic** control beside the game screen. Allow microphone access when prompted;
-  voice is sent only to teammates using encrypted WebRTC peer connections. The mic stays unavailable when you have no teammates
-  (for example, in a two-player match with one player on each team). Voice requires HTTPS (or localhost) and a browser with
-  WebRTC support. It uses STUN for peer discovery but has no TURN relay configured, so some restrictive networks may prevent voice
-  connections. The room signaling server, STUN service, and other voice participants can see network connection metadata such as IP addresses.
-- **Rounds, no timer.** Private rooms have 1, 3, 5 or 7 rounds. A round ends when someone (or a team) reaches the kill target (5, 10, 15 or 20).
-  In a room with "Random" map, every round is played on a different map. The series winner is the one with most rounds won.
-- Public Quick Play uses elimination rounds: players do not respawn until the next round.
+- Open the game to the lobby. **PLAY** joins a public match; **Settings** lets you arrange the touch controls before a match.
+- **Multiplayer** creates a private waiting lobby. Share the room code or invite link, wait for another player, then the host presses **Start Game**.
+  Joining by room code or invite link opens that lobby. Players who join after the host starts enter the active match.
+- **Rounds, no timer.** Choose 1 to 7 rounds for a series (the public room creator or private-room host sets the match). A round ends when someone (or a team) reaches the kill target (5, 10, 15 or 20).
+  In a room with "Random" map, every round is played on a different map. After the selected final round, the result is shown and players return to the lobby instead of starting another series.
 - **Modes.** Everyone vs everyone (up to 5 players) or Teams 5 vs 5 (up to 10 players). No friendly fire: bullets pass through
   teammates and grenades and rockets do not hurt them.
-- **Weapons.** You start with a pistol (unlimited spare bullets). You can carry 3 guns and choose which one to use.
-  Only 5 guns, 5 bombs and 5 turbo rockets lie on the map at a time. A taken item comes back after 3 minutes at a different spot.
-  A dead player's guns drop on the ground for 1 minute.
-- **First aid kits.** Up to 5 kits appear on the map. Each restores up to 50 HP (and is not consumed at full health); a collected kit respawns
-  after 3 minutes at a different spot.
-- Going outside the arena triggers a warning and drains health gradually until you return. Spawn protection lasts 2 seconds.
+- **Weapons and supplies.** You start with a pistol (unlimited spare bullets). You can carry 3 guns and choose which one to use.
+  Up to 5 guns, 5 bombs, 5 turbo rockets, 5 ammo boxes and 3 first-aid kits lie on the map at a time.
+  World guns and ammo boxes return 3 minutes after collection; first-aid kits return after 2 minutes. Other collected map items return after 3 minutes.
+  Each ammo box adds 100 reserve bullets to the equipped ammo-using gun, or the first ammo-using gun in your inventory. It stays on the map if you have no ammo-using gun.
+  A first-aid kit restores up to 40 health, to a maximum of 100; it is not consumed when your health is already full.
+  A dead player's guns drop on the ground for 1 minute, then disappear.
+- Going outside the red border shows a warning. After a 1.5-second grace period, your health drains by 10 per second until you return or are eliminated. Spawn protection lasts 2 seconds.
 
 ## Controls
 
 | | Desktop | Phone (landscape) |
 |---|---|---|
-| Move / fly | A D, W or Space | left joystick (push up to fly) or JET button |
-| Aim and fire | mouse, hold the left button, or F | drag the right aim joystick; holding it also fires |
+| Move / fly | A D, W or Space | left joystick (push up to fly; the soldier turns where you steer) |
+| Aim and fire | mouse, hold the left button | aim with the right joystick and hold it to fire |
 | Choose gun | 1 2 3, Q, mouse wheel | tap the weapon boxes at the bottom |
 | Pick up / swap (bag full) | E | round E button |
 | Bomb / reload | G / R | round buttons |
 | Sound | M or the Sound button | Sound button |
-| Chat / voice | Chat and Mic controls beside the game | Chat button in the lobby; Mic is available in team matches |
 
-Open **Settings** during a match to change touch control size and opacity, rebind keyboard actions, or arrange touch controls by dragging them. The move and aim joysticks, JET, bomb, reload, pickup, and weapon slots can be repositioned. Drag the right aim joystick to aim in any direction; keeping it pushed also fires. Settings are saved in the current browser on the current device; use **Reset defaults** to restore them.
-
-On touch devices, the game requests fullscreen and landscape orientation when supported. If the browser or device does not allow orientation locking, the game stays covered by a rotate-your-phone prompt while in portrait; the page itself does not scroll.
+On phones, use **Settings** before or during a match to drag the movement joystick, aim/fire joystick, bomb, reload, pickup, and weapon bar to comfortable positions. Changes are saved on that device; use **Reset Controls** to restore the defaults.
 
 Guns lying on the ground are picked up by walking over them while you have a free slot. When your bag is full, stand on the gun and
 press E (or tap the E button) to swap.
+
+In the private waiting lobby, use **Copy Code** or **Invite** before the match starts. The host can change touch settings there and starts the match when everyone is ready.
 
 ## Folders
 

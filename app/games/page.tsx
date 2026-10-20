@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function GamesPage() {
   let signedIn = false;
   let hasStrikerPlan = false;
-  let gameLogos = new Map<string, string>();
+  let gameLogos = new Map<string, string>([
+    ["game_logo_mini_soldier_arena", "/mini-soldier-arena-logo.png"],
+  ]);
 
   if (hasSupabaseConfig()) {
     const supabase = createClient();
@@ -20,6 +22,7 @@ export default async function GamesPage() {
       "game_logo_campus_coin_rush",
       "game_logo_galactic_striker",
     ]);
+    gameLogos.set("game_logo_mini_soldier_arena", "/mini-soldier-arena-logo.png");
 
     if (user) {
       const { data: subscription, error: subscriptionError } = await supabase.rpc("my_subscription");
@@ -70,6 +73,19 @@ export default async function GamesPage() {
       icon: "✦",
       visual: "striker",
     },
+    {
+      id: "mini-soldier-arena",
+      title: "Mini Soldier Arena",
+      tagline: "Team up. Lock in. Take the arena.",
+      category: "MULTIPLAYER · ONLINE SHOOTER",
+      description: "Jump into public battles or create a private room. Play free-for-all or team matches with friends.",
+      href: "/games/mini-soldier-arena",
+      cta: "Play now",
+      registerHref: undefined,
+      logoKey: "game_logo_mini_soldier_arena",
+      icon: "⚔",
+      visual: "mini-soldier",
+    },
   ];
 
   return (
@@ -114,6 +130,14 @@ export default async function GamesPage() {
                 ) : game.visual === "striker" ? (
                   <Image
                     src="/galactic-striker-promo.png"
+                    alt=""
+                    fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
+                    className="game-arcade-promo"
+                  />
+                ) : game.visual === "mini-soldier" ? (
+                  <Image
+                    src="/mini-soldier-arena-promo.jpg"
                     alt=""
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
