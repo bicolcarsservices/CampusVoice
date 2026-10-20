@@ -1,4 +1,9 @@
-export const SERVER_URL: string = import.meta.env.VITE_SERVER_URL ?? 'ws://localhost:2567';
+const configuredServerHost = import.meta.env.VITE_SERVER_HOST
+  ?.replace(/^https?:\/\//, '')
+  .replace(/\/+$/, '');
+
+export const SERVER_URL: string = import.meta.env.VITE_SERVER_URL
+  ?? (configuredServerHost ? `wss://${configuredServerHost}` : 'ws://localhost:2567');
 
 export const GAME_W = 1280;
 export const GAME_H = 720;
