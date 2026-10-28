@@ -40,52 +40,61 @@ export default async function DatingProfilePage({ params }: { params: { username
   else if (friendship?.status === "pending") friendLabel = "incoming";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <Link href="/dating" className="font-semibold text-brand">← Dating</Link>
-      <header className="card space-y-4">
-        <div className="flex flex-wrap items-center gap-4">
-          {avatarUrl
-            ? <img src={avatarUrl} alt="" className="avatar-fallback h-20 w-20 object-cover" />
-            : <div className="avatar-fallback h-20 w-20 text-2xl">{profile.display_name.slice(0, 1).toUpperCase()}</div>}
-          <div>
-            <p className="eyebrow">Profile</p>
-            <h1 className="text-3xl font-bold">{profile.display_name} {online && <span className="text-sm font-semibold text-emerald-600">Online</span>}</h1>
-            <p className="text-slate-500">@{profile.username}</p>
-            <p className="text-sm text-slate-500">{profile.school_name ?? "Campus member"}</p>
+    <div className="dating-profile community-profile mx-auto space-y-5">
+      <Link href="/dating" className="community-profile-back">← Dating</Link>
+      <header className="dating-profile-card">
+        <div className="dating-profile-cover" aria-hidden="true" />
+        <div className="dating-profile-content">
+          <div className="community-profile-avatar-ring">
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" className="community-profile-avatar" />
+              : <div className="community-profile-avatar community-profile-avatar-fallback">{profile.display_name.slice(0, 1).toUpperCase()}</div>}
+          </div>
+          <p className="community-profile-kicker">Dating profile</p>
+          <h1>{profile.display_name}</h1>
+          <p className="community-profile-username">@{profile.username}</p>
+          <div className="dating-profile-details">
+            {online && <span className="dating-profile-online"><span aria-hidden="true" /> Online now</span>}
+            <span>{profile.school_name ?? "Campus member"}</span>
+          </div>
+          {profile.bio && <p className="community-profile-bio">{profile.bio}</p>}
+          <div className="dating-profile-actions">
+            {!mine && (
+              <>
+                {friendLabel === "none" && (
+                  <SocialActionForm action={sendFriendRequest} submitLabel="Add friend" buttonClassName="btn-ghost">
+                    <input type="hidden" name="user_id" value={profile.id} />
+                  </SocialActionForm>
+                )}
+                {friendLabel === "outgoing" && <span className="btn-ghost pointer-events-none opacity-70">Requested</span>}
+                {friendLabel === "incoming" && <Link href="/dating" className="btn-ghost">Respond on Dating</Link>}
+                {friendLabel === "friends" && (
+                  <SocialActionForm action={removeFriend} submitLabel="Unfriend">
+                    <input type="hidden" name="user_id" value={profile.id} />
+                  </SocialActionForm>
+                )}
+                <Link href={`/messages/${profile.id}`} className="btn-primary">Message</Link>
+              </>
+            )}
+            {mine && <Link href="/settings#profile" className="btn-primary">Manage your photos</Link>}
           </div>
         </div>
-        {profile.bio && <p>{profile.bio}</p>}
-        {!mine && (
-          <div className="flex flex-wrap gap-2">
-            {friendLabel === "none" && (
-              <SocialActionForm action={sendFriendRequest} submitLabel="Add friend" buttonClassName="btn-ghost">
-                <input type="hidden" name="user_id" value={profile.id} />
-              </SocialActionForm>
-            )}
-            {friendLabel === "outgoing" && <span className="btn-ghost pointer-events-none opacity-70">Requested</span>}
-            {friendLabel === "incoming" && <Link href="/dating" className="btn-ghost">Respond on Dating</Link>}
-            {friendLabel === "friends" && (
-              <SocialActionForm action={removeFriend} submitLabel="Unfriend">
-                <input type="hidden" name="user_id" value={profile.id} />
-              </SocialActionForm>
-            )}
-            <Link href={`/messages/${profile.id}`} className="btn-primary">Message</Link>
-          </div>
-        )}
-        {mine && <Link href="/profile" className="btn-ghost">Manage your photos</Link>}
       </header>
 
-      <section className="space-y-3">
-        <h2 className="text-xl font-bold">Photos</h2>
+      <section className="community-profile-gallery-section">
+        <div className="community-profile-section-heading">
+          <h2>Photos</h2>
+          <span>{photos?.length ?? 0}</span>
+        </div>
         <p className="text-sm text-slate-500">Profile photos only. These do not appear on the Freedom Wall.</p>
         {!photos?.length && <p className="card text-slate-500">No photos yet.</p>}
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="community-profile-photo-grid">
           {(photos ?? []).map((photo) => {
             const url = supabase.storage.from("profile-photos").getPublicUrl(photo.image_path).data.publicUrl;
             return (
-              <figure key={photo.id} className="card overflow-hidden p-0">
-                <img src={url} alt={photo.caption || ""} className="aspect-square w-full object-cover" />
-                {photo.caption && <figcaption className="p-3 text-sm">{photo.caption}</figcaption>}
+              <figure key={photo.id} className="community-profile-photo">
+                <img src={url} alt={photo.caption || ""} />
+                {photo.caption && <figcaption>{photo.caption}</figcaption>}
               </figure>
             );
           })}

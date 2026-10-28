@@ -1,5 +1,5 @@
 -- Run after supabase/schema.sql and supabase/dating.sql.
--- Adds private group conversations, message reactions, and private voice-note storage.
+-- Adds private group conversations, message reactions, voice notes, and per-user chat settings.
 
 alter table public.direct_messages add column if not exists audio_path text;
 
@@ -151,7 +151,11 @@ begin
 
   select display_name into sender_name from public.profiles where id = uid;
   insert into public.notifications (user_id, type, message, link)
-  values (p_recipient_id, 'direct_message', coalesce(sender_name, 'Someone') || ' sent you a message.', '/messages/' || uid::text);
+  select p_recipient_id, 'direct_message', coalesce(sender_name, 'Someone') || ' sent you a message.', '/messages/' || uid::text
+  where not exists (
+    select 1 from public.chat_preferences cp
+    where cp.user_id = p_recipient_id and cp.other_user_id = uid and cp.muted
+  );
   return new_id;
 end $$;
 
@@ -272,7 +276,11 @@ begin
   insert into public.notifications (user_id, type, message, link)
   select m.user_id, 'direct_message', 'New message in ' || g.name, '/messages/group/' || g.id::text
   from public.group_chat_members m join public.group_chats g on g.id = m.group_id
-  where m.group_id = p_group_id and m.user_id <> uid;
+  where m.group_id = p_group_id and m.user_id <> uid
+    and not exists (
+      select 1 from public.chat_preferences cp
+      where cp.user_id = m.user_id and cp.group_id = p_group_id and cp.muted
+    );
   return new_id;
 end $$;
 
@@ -325,6 +333,117 @@ revoke all on function public.toggle_message_reaction(text, uuid, uuid) from pub
 revoke all on function public.send_direct_message(uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.create_group_chat(text, uuid[]) to authenticated;
 grant execute on function public.my_group_chats() to authenticated;
+
+create table if not exists public.chat_preferences (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  other_user_id uuid references public.profiles(id) on delete cascade,
+  group_id uuid references public.group_chats(id) on delete cascade,
+  muted boolean not null default false,
+  deleted_at timestamptz,
+  updated_at timestamptz not null default now(),
+  check ((other_user_id is not null)::int + (group_id is not null)::int = 1),
+  check (other_user_id is null or other_user_id <> user_id)
+);
+
+create unique index if not exists chat_preferences_direct_unique
+  on public.chat_preferences (user_id, other_user_id) where other_user_id is not null;
+create unique index if not exists chat_preferences_group_unique
+  on public.chat_preferences (user_id, group_id) where group_id is not null;
+
+alter table public.chat_preferences enable row level security;
+revoke all on public.chat_preferences from public, anon, authenticated;
+grant select on public.chat_preferences to authenticated;
+drop policy if exists chat_preferences_read_own on public.chat_preferences;
+create policy chat_preferences_read_own on public.chat_preferences for select to authenticated
+  using (user_id = auth.uid());
+
+create or replace function public.set_chat_muted(
+  p_other_user_id uuid default null,
+  p_group_id uuid default null,
+  p_muted boolean default false
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  if not public.is_active_user() then raise exception 'ACCOUNT_NOT_ACTIVE'; end if;
+  if (p_other_user_id is not null)::int + (p_group_id is not null)::int <> 1 then
+    raise exception 'INVALID_CONVERSATION';
+  end if;
+
+  if p_other_user_id is not null then
+    if p_other_user_id = uid or not exists (
+      select 1 from public.profiles where id = p_other_user_id and status = 'active'
+    ) then raise exception 'USER_NOT_FOUND'; end if;
+    insert into public.chat_preferences (user_id, other_user_id, muted, updated_at)
+    values (uid, p_other_user_id, p_muted, now())
+    on conflict (user_id, other_user_id) where other_user_id is not null
+    do update set muted = excluded.muted, updated_at = excluded.updated_at;
+  else
+    if not public.is_group_chat_member(p_group_id) then raise exception 'NOT_GROUP_MEMBER'; end if;
+    insert into public.chat_preferences (user_id, group_id, muted, updated_at)
+    values (uid, p_group_id, p_muted, now())
+    on conflict (user_id, group_id) where group_id is not null
+    do update set muted = excluded.muted, updated_at = excluded.updated_at;
+  end if;
+end $$;
+
+create or replace function public.delete_direct_conversation(p_other_user_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+begin
+  if uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  if not public.is_active_user() then raise exception 'ACCOUNT_NOT_ACTIVE'; end if;
+  if p_other_user_id is null or p_other_user_id = uid then raise exception 'INVALID_CONVERSATION'; end if;
+  if not exists (select 1 from public.profiles where id = p_other_user_id and status = 'active') then
+    raise exception 'USER_NOT_FOUND';
+  end if;
+
+  insert into public.chat_preferences (user_id, other_user_id, deleted_at, updated_at)
+  values (uid, p_other_user_id, now(), now())
+  on conflict (user_id, other_user_id) where other_user_id is not null
+  do update set deleted_at = excluded.deleted_at, updated_at = excluded.updated_at;
+end $$;
+
+create or replace function public.leave_group_chat(p_group_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  uid uuid := auth.uid();
+  departing_role text;
+  next_admin uuid;
+begin
+  if uid is null then raise exception 'NOT_AUTHENTICATED'; end if;
+  if not public.is_active_user() then raise exception 'ACCOUNT_NOT_ACTIVE'; end if;
+  select role into departing_role
+  from public.group_chat_members
+  where group_id = p_group_id and user_id = uid;
+  if departing_role is null then raise exception 'NOT_GROUP_MEMBER'; end if;
+
+  if departing_role = 'admin' then
+    select user_id into next_admin
+    from public.group_chat_members
+    where group_id = p_group_id and user_id <> uid
+    order by joined_at, user_id
+    limit 1;
+    if next_admin is not null then
+      update public.group_chat_members set role = 'admin'
+      where group_id = p_group_id and user_id = next_admin;
+    end if;
+  end if;
+
+  delete from public.group_chat_members where group_id = p_group_id and user_id = uid;
+end $$;
+
+revoke all on function public.set_chat_muted(uuid, uuid, boolean) from public, anon, authenticated;
+revoke all on function public.delete_direct_conversation(uuid) from public, anon, authenticated;
+revoke all on function public.leave_group_chat(uuid) from public, anon, authenticated;
+grant execute on function public.set_chat_muted(uuid, uuid, boolean) to authenticated;
+grant execute on function public.delete_direct_conversation(uuid) to authenticated;
+grant execute on function public.leave_group_chat(uuid) to authenticated;
 grant execute on function public.send_group_chat_message(uuid, text, text, text) to authenticated;
 grant execute on function public.unsend_group_chat_message(uuid) to authenticated;
 grant execute on function public.toggle_message_reaction(text, uuid, uuid) to authenticated;

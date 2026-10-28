@@ -35,7 +35,12 @@ export default function WallFilters({
           className="input wall-search-input"
           placeholder="Search posts..."
         />
-        <button className="btn-primary wall-search-submit" type="submit">Search</button>
+        <button className="btn-primary wall-search-submit" type="submit" aria-label="Search posts" title="Search posts">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.8" cy="10.8" r="6.8" />
+            <path d="m16 16 4.5 4.5" />
+          </svg>
+        </button>
         <button
           className={`wall-filter-toggle${filtersOpen ? " wall-filter-toggle-active" : ""}`}
           type="button"

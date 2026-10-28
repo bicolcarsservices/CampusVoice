@@ -1,4 +1,4 @@
-export const metadata = { title: "Privacy Policy | CampusVoice" };
+export const metadata = { title: "Privacy Policy | KanyaKanyaNa" };
 
 export default function PrivacyPage() {
   return (
@@ -6,16 +6,16 @@ export default function PrivacyPage() {
       <header>
         <p className="eyebrow">Your data matters</p>
         <h1 className="text-4xl font-extrabold">Privacy Policy</h1>
-        <p className="mt-2 text-sm text-slate-500">How CampusVoice handles information when you use the service.</p>
+        <p className="mt-2 text-sm text-slate-500">How KanyaKanyaNa handles information when you use the service.</p>
       </header>
       <section>
         <h2 className="text-xl font-bold">Information we handle</h2>
-        <p>CampusVoice processes account details such as your email address, username, profile information, and authentication identifiers. We also store content and activity you submit, including posts, comments, reactions, reports, school details, and moderation records.</p>
+        <p>KanyaKanyaNa processes account details such as your email address, username, profile information, and authentication identifiers. We also store content and activity you submit, including posts, comments, reactions, reports, school details, and moderation records.</p>
         <p>When you use plans or wallet features, related records may include subscription status, payment references, top-up or withdrawal requests, and payout information you choose to submit. Game records may include Dias and inventory, locally held game progress, conversion requests, and cashout requests.</p>
       </section>
       <section>
         <h2 className="text-xl font-bold">How information is used</h2>
-        <p>Information is used to provide accounts and community features, display profiles and posts, enforce plan limits, administer payments and game requests, prevent abuse, respond to reports, and maintain service security. Supabase provides authentication and database services. Payment instructions may direct you to third-party payment services; CampusVoice does not receive your payment-provider password.</p>
+        <p>Information is used to provide accounts and community features, display profiles and posts, enforce plan limits, administer payments and game requests, prevent abuse, respond to reports, and maintain service security. Supabase provides authentication and database services. Payment instructions may direct you to third-party payment services; KanyaKanyaNa does not receive your payment-provider password.</p>
       </section>
       <section>
         <h2 className="text-xl font-bold">Public and anonymous posts</h2>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         <h2 className="text-xl font-bold">Your choices</h2>
         <p>You can choose what profile details and content to publish and whether to post anonymously. You may stop using the service at any time. Some records may remain available to administrators where needed for moderation, transaction history, or service integrity.</p>
       </section>
-      <p className="text-sm text-slate-500">This policy describes current CampusVoice features and may be updated as the service changes. The operator should review it for the project’s actual practices and applicable requirements.</p>
+      <p className="text-sm text-slate-500">This policy describes current KanyaKanyaNa features and may be updated as the service changes. The operator should review it for the project’s actual practices and applicable requirements.</p>
     </article>
   );
 }

@@ -17,7 +17,7 @@ export default async function ShareQrCode() {
       <div className="share-qr-code">
         <img
           src={dataUrl}
-          alt="Scan this QR code to open CampusVoice"
+          alt="I-scan ang QR code para buksan ang KanyaKanyaNa"
           width={220}
           height={220}
         />
@@ -25,7 +25,7 @@ export default async function ShareQrCode() {
       <a
         className="btn-ghost share-qr-download"
         href={dataUrl}
-        download="campusvoice-qr.png"
+        download="kanyakanyana-qr.png"
       >
         Download QR code
       </a>

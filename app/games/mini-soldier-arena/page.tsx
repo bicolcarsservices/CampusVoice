@@ -30,7 +30,7 @@ export default function MiniSoldierArenaPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">CampusVoice games · Free to play</p>
+          <p className="eyebrow">KanyaKanyaNa games · Free to play</p>
           <h1 className="text-3xl font-extrabold">Mini Soldier Arena</h1>
         </div>
         <Link href="/games" className="btn-ghost">All games</Link>

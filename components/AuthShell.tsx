@@ -5,21 +5,17 @@ export default function AuthShell({
   description,
   children,
   footer,
-  heroLogoUrl,
 }: {
   title: string;
   description: string;
   children: ReactNode;
   footer: ReactNode;
-  heroLogoUrl?: string;
 }) {
-  const resolvedHeroLogoUrl = heroLogoUrl || "/campusvoice-logo.jpg";
-
   return (
     <section className="auth-screen">
       <header className="auth-hero">
-        <img className="auth-mark auth-mark-image" src={resolvedHeroLogoUrl} alt="CampusVoice logo" />
-        <p className="auth-kicker">YOUR VOICE. YOUR SPACE.</p>
+        <img className="auth-mark auth-mark-image" src="/kanyakanyana-mark.svg" alt="KanyaKanyaNa logo" />
+        <p className="auth-kicker">KANYA-KANYANG KWENTO, IISANG TAMBAYAN</p>
         <h1>{title}</h1>
         <p>{description}</p>
       </header>

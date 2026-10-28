@@ -22,10 +22,8 @@ function ResetSubmit() {
 
 export default function LoginForm({
   searchParams,
-  heroLogoUrl,
 }: {
   searchParams?: { error?: string; registered?: string; next?: string };
-  heroLogoUrl?: string;
 }) {
   const [state, action] = useFormState(login, null);
   const [resendState, resendAction] = useFormState(resendConfirmation, null);
@@ -37,8 +35,7 @@ export default function LoginForm({
     <AuthShell
       title="Welcome back"
       description="Connect with your campus community."
-      footer={<>New to CampusVoice? <Link href={registerHref}>Create account</Link></>}
-      heroLogoUrl={heroLogoUrl}
+      footer={<>Bago sa KanyaKanyaNa? <Link href={registerHref}>Gumawa ng account</Link></>}
     >
       {searchParams?.registered === "1" && (
         <div className="mb-4 space-y-3">

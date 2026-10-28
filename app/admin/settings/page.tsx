@@ -1,11 +1,11 @@
 import AdminActionForm from "@/components/admin/AdminActionForm";
 import { createClient } from "@/lib/supabase/server";
 import { saveBrandLogo, saveWebsiteSetting } from "@/server/admin-actions";
-import { authLogoSettingKeys, authLogoSettings, gameLogoSettings, publicStorageUrl } from "@/lib/branding";
+import { gameLogoSettings, publicStorageUrl } from "@/lib/branding";
 
 const settingInfo = [
-  { key: "site_name", label: "Website name", fallback: "CampusVoice", type: "text" },
-  { key: "tagline", label: "Tagline", fallback: "Your Voice. Your Space. Your Story.", type: "text" },
+  { key: "site_name", label: "Website name", fallback: "KanyaKanyaNa", type: "text" },
+  { key: "tagline", label: "Tagline", fallback: "Kanya-kanyang kwento, iisang tambayan.", type: "text" },
   { key: "free_daily_post_limit", label: "Free daily post limit", fallback: 2, type: "number" },
   { key: "require_post_approval", label: "Require post approval", fallback: false, type: "boolean" },
   { key: "maintenance_mode", label: "Maintenance mode", fallback: false, type: "boolean" },
@@ -19,7 +19,6 @@ export default async function AdminSettingsPage() {
     "free_daily_post_limit",
     "require_post_approval",
     "maintenance_mode",
-    ...authLogoSettingKeys,
     ...gameLogoSettings.map((setting) => setting.key),
   ];
   const { data, error } = await supabase
@@ -28,18 +27,15 @@ export default async function AdminSettingsPage() {
     .in("key", settingKeys);
   if (error) throw new Error(`Could not load website settings: ${error.message}`);
   const values = new Map((data ?? []).map((row) => [row.key, row.value]));
-  const logoSettings = [
-    ...authLogoSettings.map((setting) => ({ ...setting, bucket: "brand-assets" })),
-    ...gameLogoSettings.map((setting) => ({ ...setting, bucket: "game-logos" })),
-  ];
+  const logoSettings = gameLogoSettings.map((setting) => ({ ...setting, bucket: "game-logos" }));
 
   return (
     <section className="space-y-4">
       <div><h2 className="text-2xl font-bold">Website settings</h2><p className="text-sm text-slate-500">Changes are stored in Supabase and audit-logged.</p></div>
       <div className="card space-y-5">
         <div>
-          <h3 className="text-xl font-bold">Brand and game logos</h3>
-          <p className="mt-1 text-sm text-slate-500">Upload a JPG, PNG, or WebP image up to 2 MB. Logos appear on the login and registration pages or in the Games catalog.</p>
+          <h3 className="text-xl font-bold">Game logos</h3>
+          <p className="mt-1 text-sm text-slate-500">Upload a JPG, PNG, or WebP image up to 2 MB. These logos appear in the Games catalog. KanyaKanyaNa branding is fixed across the site.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {logoSettings.map((setting) => {

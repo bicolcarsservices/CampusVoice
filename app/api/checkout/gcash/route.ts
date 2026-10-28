@@ -143,7 +143,7 @@ export async function POST(request: Request) {
       currency: "PHP",
       payment_method_allowed: ["gcash"],
       capture_type: "automatic",
-      description: `CampusVoice ${plan.name}`,
+      description: `KanyaKanyaNa ${plan.name}`,
     }, "create_payment_intent");
     if (!intent.attributes.client_key) {
       throw new CheckoutError("PayMongo returned no payment client key.", "create_payment_intent");

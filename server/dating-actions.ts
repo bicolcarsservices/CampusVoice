@@ -47,6 +47,7 @@ function actionError(message: string) {
   if (message.includes("NOT_GROUP_MEMBER")) return "You are no longer a member of that group.";
   if (message.includes("INVALID_GROUP_MEMBERS")) return "Choose between 1 and 49 active group members.";
   if (message.includes("INVALID_GROUP_NAME")) return "Group names must be between 2 and 60 characters.";
+  if (message.includes("INVALID_CONVERSATION")) return "Choose one valid conversation.";
   if (message.includes("MESSAGE_TOO_LONG")) return "Messages can be up to 2,000 characters.";
   if (message.includes("INVALID_MEDIA_PATH")) return "The attached media could not be verified.";
   return message;
@@ -334,4 +335,60 @@ export async function unsendDirectMessage(_: ActionState, formData: FormData): P
   if (error) return { error: actionError(error.message) };
   revalidatePath("/messages");
   return { success: "Message unsent." };
+}
+
+export async function setChatMuted({
+  otherUserId,
+  groupId,
+  muted,
+}: {
+  otherUserId?: string;
+  groupId?: string;
+  muted: boolean;
+}): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in." };
+  if (Boolean(otherUserId) === Boolean(groupId)) return { error: "Choose one conversation." };
+  const conversationId = uuidSchema.safeParse(otherUserId ?? groupId);
+  if (!conversationId.success) return { error: "That conversation could not be updated." };
+
+  const { error } = await result.supabase.rpc("set_chat_muted", {
+    p_other_user_id: otherUserId ?? null,
+    p_group_id: groupId ?? null,
+    p_muted: muted,
+  });
+  if (error) return { error: actionError(error.message) };
+  revalidatePath("/messages");
+  if (otherUserId) revalidatePath(`/messages/${conversationId.data}`);
+  else revalidatePath(`/messages/group/${conversationId.data}`);
+  return { success: muted ? "Conversation muted." : "Conversation unmuted." };
+}
+
+export async function deleteDirectConversation(otherUserId: string): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in." };
+  const conversationId = uuidSchema.safeParse(otherUserId);
+  if (!conversationId.success) return { error: "That conversation could not be deleted." };
+  const { error } = await result.supabase.rpc("delete_direct_conversation", {
+    p_other_user_id: conversationId.data,
+  });
+  if (error) return { error: actionError(error.message) };
+  revalidatePath("/messages");
+  revalidatePath(`/messages/${conversationId.data}`);
+  return { redirectTo: "/messages" };
+}
+
+export async function leaveGroupConversation(groupId: string): Promise<ActionState> {
+  const result = await getActiveUser();
+  if (!result.user) return { error: result.error ?? "Please log in." };
+  const conversationId = uuidSchema.safeParse(groupId);
+  if (!conversationId.success) return { error: "That group conversation could not be left." };
+  const { error } = await result.supabase.rpc("leave_group_chat", {
+    p_group_id: conversationId.data,
+  });
+  if (error) return { error: actionError(error.message) };
+  revalidatePath("/messages");
+  revalidatePath(`/messages/group/${conversationId.data}`);
+  revalidatePath("/dating");
+  return { redirectTo: "/messages" };
 }

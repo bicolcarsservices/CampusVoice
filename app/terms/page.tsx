@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Terms of Use | CampusVoice" };
+export const metadata = { title: "Terms of Use | KanyaKanyaNa" };
 
 export default function TermsPage() {
   return (
@@ -8,10 +8,10 @@ export default function TermsPage() {
       <header>
         <p className="eyebrow">A respectful community</p>
         <h1 className="text-4xl font-extrabold">Terms of Use</h1>
-        <p className="mt-2 text-sm text-slate-500">Rules for using CampusVoice and its community, plan, wallet, and game features.</p>
+        <p className="mt-2 text-sm text-slate-500">Rules for using KanyaKanyaNa and its community, plan, wallet, and game features.</p>
       </header>
       <section>
-        <h2 className="text-xl font-bold">Using CampusVoice</h2>
+        <h2 className="text-xl font-bold">Using KanyaKanyaNa</h2>
         <p>Use an account you control, keep your sign-in credentials private, and provide accurate information for account, payment, or payout requests. You are responsible for activity performed through your account. Do not attempt to bypass access controls, interfere with the service, or exploit bugs.</p>
       </section>
       <section>
@@ -21,7 +21,7 @@ export default function TermsPage() {
       </section>
       <section>
         <h2 className="text-xl font-bold">Plans and trials</h2>
-        <p>Plan features, prices, and durations are shown on the Plans page and may change for future purchases. Unless explicitly stated otherwise, plans do not renew automatically. A payment request is not an active subscription until payment has been reviewed and confirmed. Eligible accounts may optionally start one free 7-day Basic or Premium trial. A trial ends automatically and does not automatically charge or convert into a paid plan. Account eligibility and trial use are enforced by CampusVoice records.</p>
+        <p>Plan features, prices, and durations are shown on the Plans page and may change for future purchases. Unless explicitly stated otherwise, plans do not renew automatically. A payment request is not an active subscription until payment has been reviewed and confirmed. Eligible accounts may optionally start one free 7-day Basic or Premium trial. A trial ends automatically and does not automatically charge or convert into a paid plan. Account eligibility and trial use are enforced by KanyaKanyaNa records.</p>
       </section>
       <section>
         <h2 className="text-xl font-bold">Wallet, games, and rewards</h2>
@@ -29,7 +29,7 @@ export default function TermsPage() {
       </section>
       <section>
         <h2 className="text-xl font-bold">Availability and changes</h2>
-        <p>CampusVoice is provided as an evolving service. Features may be changed, paused, or discontinued, and access may be limited for maintenance, security, or policy enforcement. We will make reasonable efforts to preserve accurate account and transaction records, but uninterrupted availability is not guaranteed.</p>
+        <p>KanyaKanyaNa is provided as an evolving service. Features may be changed, paused, or discontinued, and access may be limited for maintenance, security, or policy enforcement. We will make reasonable efforts to preserve accurate account and transaction records, but uninterrupted availability is not guaranteed.</p>
       </section>
       <section>
         <h2 className="text-xl font-bold">Contact and updates</h2>

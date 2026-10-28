@@ -33,9 +33,9 @@ export default async function AdminSupportPage() {
   return (
     <section className="space-y-4">
       <header>
-        <p className="eyebrow">CampusVoice Support</p>
+        <p className="eyebrow">KanyaKanyaNa Support</p>
         <h2 className="text-2xl font-extrabold">Support inbox</h2>
-        <p className="mt-1 text-sm text-slate-500">Reply as the CampusVoice Support team. Personal admin identities are not shown to members.</p>
+        <p className="mt-1 text-sm text-slate-500">Reply as the KanyaKanyaNa Support team. Personal admin identities are not shown to members.</p>
       </header>
       {!conversations.length && <p className="card text-sm text-slate-500">There are no support conversations yet.</p>}
       <div className="support-inbox-list">

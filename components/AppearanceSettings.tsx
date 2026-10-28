@@ -55,7 +55,7 @@ export default function AppearanceSettings() {
     <section className="card appearance-settings">
       <p className="eyebrow">Preferences</p>
       <h2 className="text-xl font-bold">Appearance</h2>
-      <p className="mt-1 text-sm text-slate-500">Choose how CampusVoice looks on this device.</p>
+      <p className="mt-1 text-sm text-slate-500">Piliin kung paano ipapakita ang KanyaKanyaNa sa device na ito.</p>
       <div className="appearance-options" role="group" aria-label="Appearance preference">
         {options.map((option) => (
           <button

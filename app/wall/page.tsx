@@ -105,19 +105,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
   const canInteract = Boolean(user && createClientData.data?.status === "active");
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
-      <WallPopupTicker texts={popupTexts ?? []} />
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="eyebrow">Your community feed</p>
-          <h1 className="text-3xl font-bold">Freedom Wall</h1>
-          <p className="online-count mt-1 text-sm" aria-label={`${onlineCount} users online`}>
-            <span className="online-count-dot" aria-hidden="true" />
-            {onlineCount} online
-          </p>
-        </div>
-        {canInteract && <Link href="/wall/new" className="btn-primary">Create post</Link>}
-      </header>
+    <div className="freedom-feed mx-auto max-w-2xl space-y-4">
       <WallFilters
         query={q}
         sort={sort}
@@ -126,12 +114,22 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
         schools={schools ?? []}
         categories={categories ?? []}
       />
+      <WallPopupTicker texts={popupTexts ?? []} />
+      <header className="freedom-feed-heading flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="eyebrow">Your community feed</p>
+          <h1 className="text-3xl font-bold">Freedom Wall</h1>
+          <p className="online-count mt-1 text-sm" aria-label={`${onlineCount} users online`}>
+            <span className="online-count-dot" aria-hidden="true" />
+            {onlineCount} online
+          </p>
+        </div>
+      </header>
 
       {postRows.length === 0 && (
         <section className="card text-center">
           <h2 className="text-lg font-semibold">{q ? "No matching posts" : "No posts yet"}</h2>
           <p className="mt-1 text-sm text-slate-500">{q ? "Try another search or filter." : "Be the first to share with the community."}</p>
-          {canInteract && <Link className="btn-primary mt-4" href="/wall/new">Create a post</Link>}
         </section>
       )}
 
@@ -146,7 +144,7 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
           <PostCard
             key={post.id}
             post={{ ...post, avatar_path: avatarUrl }}
-            schoolName={post.school_id ? schoolNames.get(post.school_id) ?? "CampusVoice" : "CampusVoice"}
+            schoolName={post.school_id ? schoolNames.get(post.school_id) ?? "KanyaKanyaNa" : "KanyaKanyaNa"}
             categoryName={post.category_id ? categoryNames.get(post.category_id) ?? "Community" : "Community"}
             imageUrl={imageUrl}
             comments={(commentsByPost.get(post.id) ?? []).map((comment) => ({

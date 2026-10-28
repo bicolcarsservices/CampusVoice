@@ -74,7 +74,7 @@ const ledger = () => _test.db.ledger;
   const server = await start(0); port = server.address().port;
   console.log('Campus Doodle tests (port ' + port + ')');
 
-  await test('game page can be embedded by the configured CampusVoice origin', async () => {
+  await test('game page can be embedded by the configured KanyaKanyaNa origin', async () => {
     const response = await nativeFetch(`http://localhost:${port}/`);
     assert.strictEqual(response.status, 200);
     assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'self' http:\/\/localhost:3037/);
@@ -126,7 +126,7 @@ const ledger = () => _test.db.ledger;
     assert.strictEqual(b.errors[0].code, 'unauth');
     b.close();
   });
-  await test('anonymous, invalid, and expired CampusVoice tickets cannot create game profiles', async () => {
+  await test('anonymous, invalid, and expired KanyaKanyaNa tickets cannot create game profiles', async () => {
     const b = await new Bot('Unauthorized').connect(false);
     b.send({ type: 'hello', ticket: 'not-a-signed-ticket' });
     await b.waitFor(() => b.errors.length);

@@ -118,7 +118,7 @@ export async function POST(request: Request) {
   if (result.error) {
     const message = result.error.message;
     if (message.includes("ACCOUNT_NOT_ACTIVE")) {
-      return NextResponse.json({ error: "Your CampusVoice account is not active." }, { status: 403 });
+      return NextResponse.json({ error: "Your KanyaKanyaNa account is not active." }, { status: 403 });
     }
     if (message.includes("NOT_AUTHENTICATED")) {
       return NextResponse.json({ error: "Log in again before submitting this request." }, { status: 401 });

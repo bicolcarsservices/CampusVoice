@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { logout } from "@/server/auth-actions";
 import AppearanceToggle from "@/components/AppearanceToggle";
 
-type NavigationIconName = "bell" | "user" | "messages" | "post" | "plus" | "games" | "wallet" | "support";
+type NavigationIconName = "bell" | "user" | "messages" | "post" | "plus" | "games" | "wallet" | "support" | "menu";
 
 function NavigationIcon({ name }: { name: NavigationIconName }) {
   const common = {
@@ -26,6 +24,8 @@ function NavigationIcon({ name }: { name: NavigationIconName }) {
       return <svg {...common}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></svg>;
     case "user":
       return <svg {...common}><circle cx="12" cy="8" r="4" /><path d="M5 21a7 7 0 0 1 14 0" /></svg>;
+    case "menu":
+      return <svg {...common}><path d="M4 6h16M4 12h16M4 18h16" /></svg>;
     case "messages":
       return <svg {...common}><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" /></svg>;
     case "support":
@@ -47,35 +47,27 @@ function isActivePath(pathname: string, route: string) {
 
 export default function PublicNavbar({
   signedIn,
-  isAdmin,
 }: {
   signedIn: boolean;
-  isAdmin: boolean;
 }) {
   const pathname = usePathname();
   if (pathname.startsWith("/admin")) return null;
 
   const bottomLinks: { href: string; label: string; icon: NavigationIconName; active: boolean }[] = [
-    { href: "/dating", label: "Dating & Messages", icon: "messages", active: isActivePath(pathname, "/dating") || isActivePath(pathname, "/messages") },
+    { href: "/messages", label: "Messages", icon: "messages", active: isActivePath(pathname, "/messages") },
     { href: "/games", label: "Games", icon: "games", active: isActivePath(pathname, "/games") },
     { href: "/wall/new", label: "Create Post", icon: "plus", active: isActivePath(pathname, "/wall/new") },
     { href: "/wallet", label: "Wallet", icon: "wallet", active: isActivePath(pathname, "/wallet") },
-    { href: "/profile", label: "Profile & Settings", icon: "user", active: isActivePath(pathname, "/profile") },
+    { href: "/menu", label: "Menu", icon: "menu", active: isActivePath(pathname, "/menu") || isActivePath(pathname, "/profile") || isActivePath(pathname, "/settings") },
   ];
 
   return (
     <>
       <header className="site-header z-20 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
         <nav aria-label="Main navigation" className="public-navigation mx-auto max-w-7xl px-4 py-2">
-          <Link href="/" className="public-brand" aria-label="CampusVoice home">
-            <Image
-              src="/campusvoice-logo.jpg"
-              alt="CampusVoice"
-              width={635}
-              height={202}
-              priority
-              className="public-brand-logo"
-            />
+          <Link href="/" className="public-brand" aria-label="KanyaKanyaNa home">
+            <span className="site-brand-mark" aria-hidden="true">K</span>
+            <span className="site-brand-name">KanyaKanyaNa</span>
           </Link>
           <div className="public-nav-links">
             <Link href="/wall" aria-current={isActivePath(pathname, "/wall") && pathname !== "/wall/new" ? "page" : undefined} className={`public-nav-button${pathname === "/wall" ? " public-nav-active" : ""}`}>Freedom Wall</Link>
@@ -96,17 +88,6 @@ export default function PublicNavbar({
                 >
                   <NavigationIcon name="bell" />
                 </Link>
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    aria-current={isActivePath(pathname, "/admin") ? "page" : undefined}
-                    title="Admin"
-                    className="public-nav-button public-nav-admin"
-                  >
-                    Admin
-                  </Link>
-                )}
-                <form action={logout}><button type="submit" className="public-nav-logout">Log out</button></form>
               </>
             )}
             {!signedIn && (

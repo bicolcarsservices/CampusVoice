@@ -16,7 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <section className="card mx-auto max-w-xl text-center">
         <h1 className="text-2xl font-bold">Admin access required</h1>
         <p className="mt-2 text-slate-600 dark:text-slate-300">
-          You are signed in, but this account is not registered as a CampusVoice administrator yet.
+          You are signed in, but this account is not registered as a KanyaKanyaNa administrator yet.
           In the Supabase SQL Editor, run <code>supabase/first-admin.sql</code> using the email shown
           under Authentication → Users. Then log out and sign back in.
         </p>

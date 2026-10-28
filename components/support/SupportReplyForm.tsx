@@ -25,8 +25,8 @@ export default function SupportReplyForm({ conversationId }: { conversationId: s
   return (
     <form ref={formRef} action={action} className="support-chat-composer">
       <input type="hidden" name="conversation_id" value={conversationId} />
-      <label htmlFor="support-reply" className="sr-only">Reply as CampusVoice Support</label>
-      <textarea id="support-reply" name="body" required maxLength={2000} rows={3} className="input" placeholder="Reply as CampusVoice Support…" />
+      <label htmlFor="support-reply" className="sr-only">Reply as KanyaKanyaNa Support</label>
+      <textarea id="support-reply" name="body" required maxLength={2000} rows={3} className="input" placeholder="Reply as KanyaKanyaNa Support…" />
       {state?.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
       <div className="flex justify-end"><SubmitButton /></div>
     </form>

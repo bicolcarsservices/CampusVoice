@@ -12,7 +12,7 @@ export default async function AdminPage() {
     active_subscriptions: "Active subscriptions", expired_subscriptions: "Expired subscriptions",
   };
   const adminTools = [
-    ["Support inbox", "Reply to member questions as the CampusVoice Support team.", "/admin/support"],
+    ["Support inbox", "Reply to member questions as the KanyaKanyaNa Support team.", "/admin/support"],
     ["Review posts", "Approve, hide, reject, or restore community posts.", "/admin/posts"],
     ["Moderate comments", "Manage comment visibility and moderation reasons.", "/admin/comments"],
     ["Review reports", "Handle safety reports and record resolutions.", "/admin/reports"],

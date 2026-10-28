@@ -29,7 +29,7 @@ export async function sendSupportMessage(_: SupportActionState, formData: FormDa
   }
   revalidatePath("/support");
   revalidatePath("/admin/support");
-  return { success: "Message sent to CampusVoice Support." };
+  return { success: "Message sent to KanyaKanyaNa Support." };
 }
 
 export async function replyToSupportConversation(
@@ -55,5 +55,5 @@ export async function replyToSupportConversation(
   revalidatePath("/admin/support");
   revalidatePath(`/admin/support/${conversationId.data}`);
   revalidatePath("/support");
-  return { success: "Reply sent as CampusVoice Support." };
+  return { success: "Reply sent as KanyaKanyaNa Support." };
 }

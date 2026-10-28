@@ -23,6 +23,7 @@ export default async function GroupMessagePage({ params }: { params: { groupId: 
     { data: rows, error: messagesError },
     { data: directRows, error: directError },
     { data: groupRows, error: groupErrorList },
+    { data: chatPreferences, error: preferencesError },
   ] = await Promise.all([
     supabase.from("group_chat_members").select("user_id").eq("group_id", group.id),
     supabase.from("group_chat_messages")
@@ -32,11 +33,20 @@ export default async function GroupMessagePage({ params }: { params: { groupId: 
       .limit(200),
     supabase.rpc("my_conversations"),
     supabase.rpc("my_group_chats"),
+    supabase.from("chat_preferences").select("muted")
+      .eq("user_id", user.id).eq("group_id", group.id).maybeSingle(),
   ]);
   if (membersError) throw new Error(`Could not load group members: ${membersError.message}`);
   if (messagesError) throw new Error(`Could not load group messages: ${messagesError.message}`);
   if (directError) throw new Error(`Could not load your conversations: ${directError.message}`);
   if (groupErrorList) throw new Error(`Could not load group conversations: ${groupErrorList.message}`);
+  const chatSettingsNeedSetup = Boolean(preferencesError && (
+    preferencesError.code === "42P01" || preferencesError.code === "PGRST205" ||
+    preferencesError.message.toLowerCase().includes("chat_preferences")
+  ));
+  if (preferencesError && !chatSettingsNeedSetup) {
+    throw new Error(`Could not load your group chat settings: ${preferencesError.message}`);
+  }
   const directThreads = ((directRows ?? []) as (Omit<DirectConversationLink, "avatarUrl"> & { avatar_path: string | null })[]).map((thread) => ({
     ...thread,
     avatarUrl: thread.avatar_path
@@ -91,14 +101,23 @@ export default async function GroupMessagePage({ params }: { params: { groupId: 
     <section className="messenger-thread-layout">
       <MessageSidebar directThreads={directThreads} groupThreads={groupThreads} activeThreadId={group.id} />
       <div className="messenger-thread-main">
-        <header className="messenger-thread-header">
-          <div>
-            <Link href="/dating#messages" className="text-sm font-semibold text-brand">← Messages</Link>
-            <h1 className="text-2xl font-extrabold">{group.name}</h1>
-            <p className="text-sm text-slate-500">{memberIds.length} members · {(memberIds.map((id) => names.get(id)).filter(Boolean)).join(", ")}</p>
+        <header className="messenger-thread-header messenger-thread-header-group">
+          <Link href="/messages" className="messenger-back-link" aria-label="Back to messages">←</Link>
+          <span className="messenger-participant-avatar messenger-group-avatar" aria-hidden="true">✦</span>
+          <div className="messenger-participant-info">
+            <h1>{group.name}</h1>
+            <p>{memberIds.length} members · {(memberIds.map((id) => names.get(id)).filter(Boolean)).join(", ")}</p>
           </div>
+          <div id="messenger-header-actions" className="messenger-header-actions" />
         </header>
-        <ChatThread groupId={group.id} currentUserId={user.id} messages={messages} />
+        <ChatThread
+          groupId={group.id}
+          currentUserId={user.id}
+          messages={messages}
+          conversationName={group.name}
+          initialMuted={Boolean(chatPreferences?.muted)}
+          chatSettingsNeedSetup={chatSettingsNeedSetup}
+        />
       </div>
     </section>
   );

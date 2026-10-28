@@ -8,9 +8,9 @@ import GlobalSuccessToast from "@/components/GlobalSuccessToast";
 import AppearanceController from "@/components/AppearanceController";
 
 export const metadata: Metadata = {
-  title: "CampusVoice",
-  description: "Your Voice. Your Space. Your Story.",
-  icons: { icon: "/campusvoice-logo.jpg" },
+  title: "KanyaKanyaNa",
+  description: "Kanya-kanyang kwento, iisang tambayan. I-share ang campus life mo sa KanyaKanyaNa.",
+  icons: { icon: "/kanyakanyana-mark.svg" },
 };
 
 export const viewport: Viewport = {

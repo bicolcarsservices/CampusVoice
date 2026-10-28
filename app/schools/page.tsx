@@ -18,7 +18,7 @@ export default async function SchoolsPage() {
         <div className="relative z-10 max-w-2xl">
           <p className="school-directory-kicker">A community for every campus</p>
           <h1>Find your school.<br /><span>Find your people.</span></h1>
-          <p>Explore the campuses sharing stories, ideas, and everyday student life on CampusVoice.</p>
+          <p>Explore the campuses sharing stories, ideas, and everyday student life on KanyaKanyaNa.</p>
           <div className="school-directory-count">
             <span className="school-count-icon" aria-hidden="true">⌂</span>
             <strong>{schools?.length ?? 0}</strong>
@@ -26,7 +26,7 @@ export default async function SchoolsPage() {
           </div>
         </div>
         <div className="school-hero-emblem" aria-hidden="true">
-          <span>CV</span><i /><b /><em />
+          <span>KK</span><i /><b /><em />
         </div>
       </header>
 

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You already have a pending claim for this reward." }, { status: 409 });
     }
     if (claimError.message.includes("ACCOUNT_NOT_ACTIVE")) {
-      return NextResponse.json({ error: "Your CampusVoice account is not active." }, { status: 403 });
+      return NextResponse.json({ error: "Your KanyaKanyaNa account is not active." }, { status: 403 });
     }
     console.error("Could not submit Campus Coin Rush reward claim", claimError);
     return NextResponse.json({ error: "Could not submit your reward claim. Please try again." }, { status: 500 });

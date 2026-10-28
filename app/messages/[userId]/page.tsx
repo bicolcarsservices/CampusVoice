@@ -4,6 +4,7 @@ import { createClient, getAuthUser } from "@/lib/supabase/server";
 import ChatThread from "@/components/social/ChatThread";
 import MessageSidebar from "@/components/social/MessageSidebar";
 import type { DirectConversationLink, GroupConversationLink } from "@/components/social/MessageSidebar";
+import { isCurrentlyOnline } from "@/lib/social";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
   if (profileError) throw new Error(`Could not load chat: ${profileError.message}`);
   if (!profile) notFound();
 
-  const [readResult, withAudio, directResult, groupResult] = await Promise.all([
+  const [readResult, withAudio, directResult, groupResult, presenceResult, preferencesResult] = await Promise.all([
     supabase.rpc("mark_thread_read", { p_other_user_id: profile.id }),
     supabase.from("direct_messages")
       .select("id,sender_id,recipient_id,body,image_path,audio_path,created_at,unsent_at")
@@ -39,9 +40,20 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
       .limit(200),
     supabase.rpc("my_conversations"),
     supabase.rpc("my_group_chats"),
+    supabase.from("user_presence").select("last_seen_at").eq("user_id", profile.id).maybeSingle(),
+    supabase.from("chat_preferences").select("muted,deleted_at")
+      .eq("user_id", user.id).eq("other_user_id", profile.id).maybeSingle(),
   ]);
   if (readResult.error) throw new Error(`Could not update the conversation read status: ${readResult.error.message}`);
   if (directResult.error) throw new Error(`Could not load your conversations: ${directResult.error.message}`);
+  if (presenceResult.error) throw new Error(`Could not load chat presence: ${presenceResult.error.message}`);
+  const chatSettingsNeedSetup = Boolean(preferencesResult.error && (
+    preferencesResult.error.code === "42P01" || preferencesResult.error.code === "PGRST205" ||
+    preferencesResult.error.message.toLowerCase().includes("chat_preferences")
+  ));
+  if (preferencesResult.error && !chatSettingsNeedSetup) {
+    throw new Error(`Could not load your chat settings: ${preferencesResult.error.message}`);
+  }
   const groupSetupNeeded = groupResult.error?.code === "PGRST202" || groupResult.error?.code === "42883";
   if (groupResult.error && !groupSetupNeeded) throw new Error(`Could not load group conversations: ${groupResult.error.message}`);
   const directThreads = ((directResult.data ?? []) as (Omit<DirectConversationLink, "avatarUrl"> & { avatar_path: string | null })[]).map((thread) => ({
@@ -51,6 +63,10 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
       : null,
   }));
   const groupThreads = groupSetupNeeded ? [] : (groupResult.data ?? []) as GroupConversationLink[];
+  const avatarUrl = profile.avatar_path
+    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
+    : null;
+  const online = isCurrentlyOnline(presenceResult.data?.last_seen_at);
   let messageRows: DirectMessageRow[] = (withAudio.data ?? []) as DirectMessageRow[];
   if (withAudio.error) {
     if (withAudio.error.code !== "42703" && withAudio.error.code !== "PGRST204" &&
@@ -64,6 +80,10 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
       .limit(200);
     if (legacy.error) throw new Error(`Could not load messages: ${legacy.error.message}`);
     messageRows = (legacy.data ?? []) as DirectMessageRow[];
+  }
+  const deletedAt = preferencesResult.data?.deleted_at;
+  if (deletedAt) {
+    messageRows = messageRows.filter((message) => message.created_at > deletedAt);
   }
 
   const messageIds = messageRows.map((row) => row.id);
@@ -106,14 +126,31 @@ export default async function MessageThreadPage({ params }: { params: { userId: 
     <section className="messenger-thread-layout">
       <MessageSidebar directThreads={directThreads} groupThreads={groupThreads} activeThreadId={profile.id} />
       <div className="messenger-thread-main">
-        <div className="messenger-thread-header">
-          <div>
-            <Link href="/dating#messages" className="text-sm font-semibold text-brand">← Messages</Link>
-            <h1 className="text-2xl font-extrabold">{profile.display_name}</h1>
-            <Link href={`/dating/${profile.username}`} className="text-sm text-slate-500">@{profile.username} · View</Link>
+        <header className="messenger-thread-header">
+          <Link href="/messages" className="messenger-back-link" aria-label="Back to messages">←</Link>
+          <Link href={`/dating/${profile.username}`} className="messenger-participant-avatar" aria-label={`View ${profile.display_name}'s profile`}>
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" />
+              : <span>{profile.display_name.slice(0, 1).toUpperCase()}</span>}
+            <span className={`messenger-presence-dot${online ? " messenger-presence-online" : ""}`} />
+          </Link>
+          <div className="messenger-participant-info">
+            <h1>{profile.display_name}</h1>
+            <Link href={`/dating/${profile.username}`}>@{profile.username} · {online ? "Online" : "View profile"}</Link>
           </div>
-        </div>
-        <ChatThread recipientId={profile.id} currentUserId={user.id} messages={messages} />
+          <div id="messenger-header-actions" className="messenger-header-actions" />
+        </header>
+        <ChatThread
+          recipientId={profile.id}
+          currentUserId={user.id}
+          messages={messages}
+          conversationName={profile.display_name}
+          participantAvatarUrl={avatarUrl}
+          participantUsername={profile.username}
+          participantHref={`/dating/${profile.username}`}
+          initialMuted={Boolean(preferencesResult.data?.muted)}
+          chatSettingsNeedSetup={chatSettingsNeedSetup}
+        />
       </div>
     </section>
   );

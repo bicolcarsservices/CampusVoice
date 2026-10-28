@@ -36,7 +36,7 @@ export default async function SubscriptionPlans({
     <div className={`subscription-plan-picker mx-auto max-w-6xl ${compact ? "subscription-plan-picker-compact" : "space-y-8"}`}>
       <header className={`mx-auto text-center ${compact ? "max-w-3xl" : "max-w-2xl"}`}>
         <p className="eyebrow">Plans that grow with your voice</p>
-        <h1 className={compact ? "text-3xl font-extrabold" : "text-4xl font-extrabold"}>Choose your CampusVoice plan</h1>
+        <h1 className={compact ? "text-3xl font-extrabold" : "text-4xl font-extrabold"}>Choose your KanyaKanyaNa plan</h1>
         {!compact && <p className="subscription-plan-explainer mt-3 text-slate-600 dark:text-slate-300">Eligible accounts may start one optional 7-day Basic or Premium trial. No payment or automatic charge. Paid plans use Maya QR and are activated after manual payment verification; plans do not renew automatically.</p>}
         {user && <p className={compact ? "mt-2 text-xs text-slate-500" : "mt-4 text-sm"}>Current plan: <strong className="capitalize">{subscription?.plan_name ?? "Free"}</strong></p>}
       </header>

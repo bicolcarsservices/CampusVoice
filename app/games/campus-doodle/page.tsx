@@ -36,17 +36,17 @@ export default async function CampusDoodlePage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">CampusVoice games · Free to play</p>
+          <p className="eyebrow">KanyaKanyaNa games · Free to play</p>
           <h1 className="text-3xl font-extrabold">Campus Doodle</h1>
         </div>
         <Link href="/games" className="btn-ghost">All games</Link>
       </header>
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {user
-          ? "Draw clues and guess with friends in real time. Play Quick Play or join private rooms with a code. CampusVoice accounts can earn and use Coins and access saved game features."
-          : "Play Quick Play with random players or join a private room with a shared code—no login needed. Only CampusVoice accounts can earn or use Coins and access saved game features."}
+          ? "Draw clues and guess with friends in real time. Play Quick Play or join private rooms with a code. KanyaKanyaNa accounts can earn and use Coins and access saved game features."
+          : "Play Quick Play with random players or join a private room with a shared code—no login needed. Only KanyaKanyaNa accounts can earn or use Coins and access saved game features."}
       </p>
-      {!user && <Link href="/login?next=%2Fgames%2Fcampus-doodle" className="btn-primary inline-flex">Log in to CampusVoice</Link>}
+      {!user && <Link href="/login?next=%2Fgames%2Fcampus-doodle" className="btn-primary inline-flex">Log in to KanyaKanyaNa</Link>}
       {gameUrl ? (
         <CampusDoodleFrame gameUrl={gameUrl} />
       ) : (

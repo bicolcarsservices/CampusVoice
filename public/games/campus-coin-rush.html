@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Campus Coin Rush — CampusVoice</title>
+<title>Campus Coin Rush — KanyaKanyaNa</title>
 <style>
 :root{--bg:#070b1f;--card:#131a3a;--line:#2a3566;--txt:#e8ecff;--mut:#9aa6d6;--coin:#fbbf24;--dia:#38bdf8;--ok:#22c55e;--warn:#f59e0b}
 *{box-sizing:border-box}[hidden]{display:none!important}
@@ -68,11 +68,11 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
 </head>
 <body>
 <header>
-  <h1>Campus Coin Rush <span class="badge">CAMPUSVOICE</span></h1>
+  <h1>Campus Coin Rush <span class="badge">KanyaKanyaNa</span></h1>
   <div class="balances">
     <div class="bal coins">🪙 Coins<b id="coinBal">0</b><small>game points</small></div>
     <div class="bal dias">💎 Dias<b id="diasBal">0</b><small>account balance</small></div>
-    <div class="bal">💳 Wallet<b id="walletBal">₱0.00</b><small>CampusVoice balance</small></div>
+    <div class="bal">💳 Wallet<b id="walletBal">₱0.00</b><small>KanyaKanyaNa balance</small></div>
   </div>
 </header>
 <nav id="tabs">
@@ -82,7 +82,7 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
   <button data-tab="history">🧾 Transaction History</button>
 </nav>
 <main>
-  <div class="banner" id="storageBanner">Dias purchases are charged securely to your CampusVoice wallet. Game Coins and play progress are saved in this browser and can be edited; load claims are not automatically verified or sent and require manual admin review.</div>
+  <div class="banner" id="storageBanner">Dias purchases are charged securely to your KanyaKanyaNa wallet. Game Coins and play progress are saved in this browser and can be edited; load claims are not automatically verified or sent and require manual admin review.</div>
 
   <section id="tab-game">
     <div class="game-layout">
@@ -145,8 +145,8 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
 
   <section id="tab-shop" hidden>
     <h2>Dias Shop</h2>
-    <div class="notice">Dias package purchases deduct the listed price from your CampusVoice wallet. Wallet top-ups sent through Maya are credited after admin verification. No extra game VAT or fee is added. Dias cannot be converted to Coins and are never lost when you die. Characters are cosmetic only.</div>
-    <p class="mut">Need wallet funds? <a href="/wallet" target="_top" style="color:#c7d8ff;text-decoration:underline">Top up your CampusVoice wallet</a>.</p>
+    <div class="notice">Dias package purchases deduct the listed price from your KanyaKanyaNa wallet. Wallet top-ups sent through Maya are credited after admin verification. No extra game VAT or fee is added. Dias cannot be converted to Coins and are never lost when you die. Characters are cosmetic only.</div>
+    <p class="mut">Need wallet funds? <a href="/wallet" target="_top" style="color:#c7d8ff;text-decoration:underline">Top up your KanyaKanyaNa wallet</a>.</p>
     <div class="panel" id="shopReceipt" hidden></div>
     <h3>Dias Packages</h3>
     <div class="grid" id="pkgGrid"></div>
@@ -181,7 +181,7 @@ footer{text-align:center;color:var(--mut);font-size:.72rem;padding:16px}
     <div class="hist" id="histList"></div>
   </section>
 </main>
-<footer>CampusVoice wallet purchases and reward claim requests are recorded on the server. Coins and play progress remain local to this browser.</footer>
+<footer>KanyaKanyaNa wallet purchases and reward claim requests are recorded on the server. Coins and play progress remain local to this browser.</footer>
 
 <div class="modal" id="modal" hidden>
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="mTitle">
@@ -228,7 +228,7 @@ const RULES=[
  'You can play '+DAILY_PLAYS+' runs per day (resets at your local midnight). Restarting counts as a new run.',
  'The game is free to play with 0 Coins and 0 Dias. There is no paid entry, no gambling, and no cash withdrawal.',
  'Coins are browser-saved game points and can be edited. Claims for ₱10 mobile load (25,000 Coins) or ₱59 GoSURF load (60,000 Coins) are manually reviewed by an admin and are not sent automatically.',
- 'Dias and character purchases are stored server-side. Dias packages are charged to your CampusVoice wallet at the listed price, with no extra in-game fee or VAT.'];
+ 'Dias and character purchases are stored server-side. Dias packages are charged to your KanyaKanyaNa wallet at the listed price, with no extra in-game fee or VAT.'];
 
 const $=id=>document.getElementById(id);
 const fmt=n=>Number(n).toLocaleString('en-US');
@@ -330,7 +330,7 @@ function renderMissions(){
 function renderShop(){
  const pk=$('pkgGrid');pk.replaceChildren();
  PACKAGES.forEach(p=>{const c=el('div','card');
-  c.append(el('h3','',p.name),el('div','big dias','💎 '+fmt(p.dias)+' Dias'),el('p','mut',p.desc),el('div','price','₱'+p.price+' from CampusVoice wallet'));
+  c.append(el('h3','',p.name),el('div','big dias','💎 '+fmt(p.dias)+' Dias'),el('p','mut',p.desc),el('div','price','₱'+p.price+' from KanyaKanyaNa wallet'));
   const b=el('button','btn primary',gameAccountReady?'Buy with wallet':'Loading wallet…');
   b.disabled=!gameAccountReady||gameAccount.walletBalanceCentavos<p.price*100;
   b.onclick=()=>buyPackage(p);c.append(b);pk.append(c)});
@@ -423,12 +423,12 @@ async function refreshGameAccount(){
  try{
   const response=await fetch('/api/game-account',{cache:'no-store'});
   const body=await response.json();
-  if(!response.ok)throw new Error(body.error||'Could not load CampusVoice wallet.');
+  if(!response.ok)throw new Error(body.error||'Could not load KanyaKanyaNa wallet.');
   applyGameAccount(body);
  }catch(error){
   gameAccountReady=false;
   $('shopReceipt').hidden=false;
-  $('shopReceipt').textContent=error instanceof Error?error.message:'Could not load CampusVoice wallet.';
+  $('shopReceipt').textContent=error instanceof Error?error.message:'Could not load KanyaKanyaNa wallet.';
   renderAll();
  }
 }
@@ -440,18 +440,18 @@ async function refreshRewardClaims(){
  }catch(error){console.error('Could not refresh game reward claims',error)}
 }
 function buyPackage(p){
- if(!gameAccountReady){toast('CampusVoice wallet is not available. Refresh the page and try again.');return}
+ if(!gameAccountReady){toast('KanyaKanyaNa wallet is not available. Refresh the page and try again.');return}
  confirmDialog({title:'Confirm Dias purchase',
   rows:[['Package',p.name],['You receive',fmt(p.dias)+' Dias'],['Wallet price','₱'+p.price],['Wallet after purchase','₱'+((gameAccount.walletBalanceCentavos-p.price*100)/100).toFixed(2)]],
-  note:'This purchase deducts the listed amount from your CampusVoice wallet. No extra in-game fee or VAT is charged.',
-  okText:'Buy with CampusVoice wallet',
+  note:'This purchase deducts the listed amount from your KanyaKanyaNa wallet. No extra in-game fee or VAT is charged.',
+  okText:'Buy with KanyaKanyaNa wallet',
   onOk:async()=>{
    try{
     const result=await postJson('/api/game-account',{action:'buyDias',packageId:p.id});
     applyGameAccount(result);
-    log('TOPUP',p.name+' ('+fmt(p.dias)+' Dias)','+'+fmt(p.dias)+' Dias','Paid from CampusVoice wallet');
+    log('TOPUP',p.name+' ('+fmt(p.dias)+' Dias)','+'+fmt(p.dias)+' Dias','Paid from KanyaKanyaNa wallet');
     save();renderAll();$('shopReceipt').hidden=false;
-    $('shopReceipt').textContent=fmt(p.dias)+' Dias added. ₱'+p.price+' was deducted from your CampusVoice wallet.';
+    $('shopReceipt').textContent=fmt(p.dias)+' Dias added. ₱'+p.price+' was deducted from your KanyaKanyaNa wallet.';
     toast('Dias purchase complete.');
    }catch(error){toast(error instanceof Error?error.message:'Could not complete Dias purchase.')}
   }});
@@ -461,7 +461,7 @@ function buySkin(s){
  if(state.dias<s.cost){toast('Not enough Dias.');return}
  confirmDialog({title:'Confirm character purchase',
   rows:[['Character',s.name],['Cost',s.cost+' Dias'],['Dias now',fmt(state.dias)],['Dias after',fmt(state.dias-s.cost)]],
-  note:'This spends Dias from your CampusVoice game account.',
+  note:'This spends Dias from your KanyaKanyaNa game account.',
   okText:'Confirm with Dias',
   onOk:async()=>{
    try{

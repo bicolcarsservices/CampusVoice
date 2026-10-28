@@ -58,8 +58,8 @@ export default function PlanRequestForm({
                 <header className="selected-plan-card">
                   <div className="selected-plan-topline">
                     <span className="selected-plan-brand">
-                      <span className="selected-plan-mark" aria-hidden="true">CV</span>
-                      CAMPUSVOICE · CAMPUS PLAN
+                      <span className="selected-plan-mark" aria-hidden="true">KK</span>
+                      KANYAKANYANA · CAMPUS PLAN
                     </span>
                     <span className="selected-plan-included">YOUR SELECTION</span>
                   </div>
@@ -86,7 +86,7 @@ export default function PlanRequestForm({
                 <button type="button" onClick={() => setStep("payment")} className="plan-detail-next">
                   Next <span aria-hidden="true">→</span>
                 </button>
-                <p className="plan-detail-footnote">Payment is reviewed by the CampusVoice team before activation.</p>
+                <p className="plan-detail-footnote">Payment is reviewed by the KanyaKanyaNa team before activation.</p>
               </>
             ) : (
               state?.success ? (
@@ -102,7 +102,7 @@ export default function PlanRequestForm({
                     {submittedAt && <div><dt>Submitted</dt><dd>{submittedAt.toLocaleString("en-PH")}</dd></div>}
                   </dl>
                   <p className="payment-confirmation-note">
-                    Your payment details were sent to the CampusVoice team. Your plan will activate after an administrator verifies the payment.
+                    Your payment details were sent to the KanyaKanyaNa team. Your plan will activate after an administrator verifies the payment.
                   </p>
                   <button type="button" className="btn-primary payment-confirmation-done" onClick={() => setStep("closed")}>
                     Done

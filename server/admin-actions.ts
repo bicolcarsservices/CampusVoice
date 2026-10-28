@@ -297,7 +297,6 @@ export async function saveBrandLogo(formData: FormData) {
   const { supabase, error: accessError } = await getAdminClient();
   if (accessError) return { error: accessError };
   const key = z.enum([
-    "auth_hero_logo",
     "game_logo_campus_doodle",
     "game_logo_campus_coin_rush",
     "game_logo_galactic_striker",

@@ -71,7 +71,7 @@ export default function AnnouncementDock({
   const announcement = announcements[selectedIndex];
 
   return (
-    <aside className="announcement-dock" aria-label="CampusVoice announcements and support">
+    <aside className="announcement-dock" aria-label="KanyaKanyaNa announcements and support">
       {open && announcement && (
         <section className="announcement-dock-panel" aria-label="Announcement">
           <header className="announcement-dock-header">
@@ -110,7 +110,7 @@ export default function AnnouncementDock({
         </button>
       )}
       {signedIn && (
-        <Link href="/support" className="support-launcher" aria-label="CampusVoice Support chat" title="CampusVoice Support">
+        <Link href="/support" className="support-launcher" aria-label="KanyaKanyaNa Support chat" title="KanyaKanyaNa Support">
           <SupportIcon />
         </Link>
       )}

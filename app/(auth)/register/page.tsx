@@ -2,7 +2,6 @@ import { createClient, hasSupabaseConfig } from "@/lib/supabase/server";
 import RegisterForm from "@/components/RegisterForm";
 import AuthShell from "@/components/AuthShell";
 import Link from "next/link";
-import { authLogoSettingKeys, getBrandAssetUrls } from "@/lib/branding";
 
 export default async function RegisterPage({ searchParams }: { searchParams?: { next?: string } }) {
   const next = searchParams?.next?.startsWith("/") && !searchParams.next.startsWith("//") ? searchParams.next : undefined;
@@ -17,17 +16,13 @@ export default async function RegisterPage({ searchParams }: { searchParams?: { 
   }
 
   const supabase = createClient();
-  const [{ data, error }, logos] = await Promise.all([
-    supabase.from("schools").select("id,name").order("name"),
-    getBrandAssetUrls(supabase, authLogoSettingKeys),
-  ]);
+  const { data, error } = await supabase.from("schools").select("id,name").order("name");
   if (error) throw new Error(`Could not load schools for registration: ${error.message}`);
   return (
     <AuthShell
       title="Create Account"
       description="Find your people. Share your campus story."
       footer={<>Already have an account? <Link href={loginHref}>Sign in</Link></>}
-      heroLogoUrl={logos.get("auth_hero_logo") ?? logos.get("auth_form_logo")}
     >
       <RegisterForm schools={data ?? []} next={next} />
     </AuthShell>

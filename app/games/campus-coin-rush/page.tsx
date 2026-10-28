@@ -12,13 +12,13 @@ export default async function CampusCoinRushPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">CampusVoice games</p>
+          <p className="eyebrow">KanyaKanyaNa games</p>
           <h1 className="text-3xl font-extrabold">Campus Coin Rush</h1>
         </div>
-        <a href="/wallet" className="btn-primary">Top up CampusVoice wallet</a>
+        <a href="/wallet" className="btn-primary">Top up KanyaKanyaNa wallet</a>
       </header>
       <p className="text-sm text-slate-500">
-        Dias purchases use your CampusVoice wallet. Maya top-ups are credited after admin verification. Load rewards are claims for manual admin review, not cash withdrawals.
+        Dias purchases use your KanyaKanyaNa wallet. Maya top-ups are credited after admin verification. Load rewards are claims for manual admin review, not cash withdrawals.
       </p>
       <iframe
         title="Campus Coin Rush"

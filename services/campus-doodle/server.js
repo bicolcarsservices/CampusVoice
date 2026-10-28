@@ -665,8 +665,8 @@ function onQuickPlay(ctx) {
 async function onHello(ctx, msg) {
   const identity = verifyTicket(msg.ticket);
   if (!identity) {
-    err(ctx, 'Your CampusVoice login expired. Refresh the game page and try again.', 'bad_ticket');
-    if (ctx.id) ctx.ws.close(4001, 'CampusVoice login expired');
+    err(ctx, 'Your KanyaKanyaNa login expired. Refresh the game page and try again.', 'bad_ticket');
+    if (ctx.id) ctx.ws.close(4001, 'KanyaKanyaNa login expired');
     return;
   }
   const id = identity.id;
@@ -706,7 +706,7 @@ async function onHello(ctx, msg) {
   ctx.authExpiresAt = identity.exp * 1000;
   if (ctx.authTimer) clearTimeout(ctx.authTimer);
   ctx.authTimer = setTimeout(() => {
-    if (ctx.authExpiresAt <= now() && ctx.ws.readyState === 1) ctx.ws.close(4001, 'CampusVoice login expired');
+    if (ctx.authExpiresAt <= now() && ctx.ws.readyState === 1) ctx.ws.close(4001, 'KanyaKanyaNa login expired');
   }, Math.max(0, ctx.authExpiresAt - now()));
   if (typeof ctx.authTimer.unref === 'function') ctx.authTimer.unref();
   sockets.set(id, ctx.ws);
@@ -1094,12 +1094,12 @@ async function route(ctx, msg) {
   if (msg.type === 'hello') return onHello(ctx, msg);
   if (!ctx.id) return err(ctx, 'Not signed in.', 'unauth');
   if (ctx.authExpiresAt <= now()) {
-    err(ctx, 'Your CampusVoice login expired. Refresh the game page and try again.', 'bad_ticket');
-    ctx.ws.close(4001, 'CampusVoice login expired');
+    err(ctx, 'Your KanyaKanyaNa login expired. Refresh the game page and try again.', 'bad_ticket');
+    ctx.ws.close(4001, 'KanyaKanyaNa login expired');
     return;
   }
   if (ctx.isGuest && !['quick_play', 'create_room', 'join_room', 'leave_room', 'update_config', 'start_match', 'rematch', 'draw', 'guess', 'choose_word'].includes(msg.type)) {
-    return err(ctx, 'Guests can play Quick Play or private rooms with a code. Log in to CampusVoice to earn or use Coins and access saved game features.', 'guest_restricted');
+    return err(ctx, 'Guests can play Quick Play or private rooms with a code. Log in to KanyaKanyaNa to earn or use Coins and access saved game features.', 'guest_restricted');
   }
   if (msg.type === 'draw') { if (!take(ctx.draw)) { ctx.violations++; return; } return onDraw(ctx, msg); }
   if (!take(ctx.general)) { ctx.violations++; return; }

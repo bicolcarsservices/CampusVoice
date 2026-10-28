@@ -37,7 +37,7 @@ export default async function AdminSupportConversationPage({ params }: { params:
           <h2 className="text-2xl font-extrabold">{profile.display_name}</h2>
           <p className="text-sm text-slate-500">@{profile.username}</p>
         </div>
-        <span className="support-team-avatar" aria-label="Replying as CampusVoice Support">CV</span>
+        <span className="support-team-avatar" aria-label="Replying as KanyaKanyaNa Support">KK</span>
       </header>
       <div className="support-admin-messages">
         {!messages.length && <p className="text-sm text-slate-500">The member has not sent a message yet.</p>}
@@ -47,7 +47,7 @@ export default async function AdminSupportConversationPage({ params }: { params:
             <article key={message.id} className={`support-message-row${fromSupport ? " support-message-row-user" : " support-message-row-team"}`}>
               {!fromSupport && <span className="support-team-avatar support-team-avatar-small" aria-hidden="true">{profile.display_name.slice(0, 1).toUpperCase()}</span>}
               <div className={`support-message-bubble${fromSupport ? " support-message-bubble-user" : " support-message-bubble-team"}`}>
-                <p className="support-message-sender">{fromSupport ? "CampusVoice Support" : profile.display_name}</p>
+                <p className="support-message-sender">{fromSupport ? "KanyaKanyaNa Support" : profile.display_name}</p>
                 <p className="whitespace-pre-wrap break-words">{message.body}</p>
                 <time className="support-message-time" dateTime={message.created_at}>{new Date(message.created_at).toLocaleString()}</time>
               </div>

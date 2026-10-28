@@ -44,7 +44,7 @@ export default function PostComposer({
       </header>
 
       <div className="post-composer-identity">
-        <span className="post-composer-avatar" aria-hidden="true">CV</span>
+        <span className="post-composer-avatar" aria-hidden="true">KK</span>
         <div>
           <p className="post-composer-audience">Share with the community</p>
           <p className="post-composer-privacy">Choose your identity below</p>

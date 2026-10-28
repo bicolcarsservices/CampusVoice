@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const secret = process.env.CAMPUS_DOODLE_AUTH_SECRET;
   if (!secret || secret.length < 32) {
-    console.error("Campus Doodle authentication is not configured in the CampusVoice app environment.");
+    console.error("Campus Doodle authentication is not configured in the KanyaKanyaNa app environment.");
     return NextResponse.json({
       error: "Campus Doodle setup is incomplete. Add CAMPUS_DOODLE_AUTH_SECRET (32+ characters) to Vercel and Render, then redeploy.",
     }, { status: 503 });

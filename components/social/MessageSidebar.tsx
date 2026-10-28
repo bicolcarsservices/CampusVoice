@@ -8,6 +8,7 @@ export type DirectConversationLink = {
   last_body: string | null;
   last_image: boolean | null;
   last_unsent: boolean | null;
+  last_at?: string | null;
   unread_count: number | null;
 };
 
@@ -31,10 +32,10 @@ export default function MessageSidebar({
     <aside className="messenger-thread-sidebar">
       <div className="messenger-thread-sidebar-heading">
         <div>
-          <p className="eyebrow">CampusVoice</p>
+          <p className="eyebrow">KanyaKanyaNa</p>
           <h2 className="text-lg font-extrabold">Chats</h2>
         </div>
-        <Link href="/dating#new-group-chat" className="messenger-new-chat" aria-label="Create a group chat" title="Create group chat">＋</Link>
+        <Link href="/messages" className="messenger-new-chat" aria-label="Open messages" title="Messages">＋</Link>
       </div>
       <div className="messenger-thread-list">
         {groupThreads.map((thread) => (
@@ -62,7 +63,7 @@ export default function MessageSidebar({
         ))}
         {!directThreads.length && !groupThreads.length && <p className="p-4 text-sm text-slate-500">Your conversations will appear here.</p>}
       </div>
-      <Link href="/dating#messages" className="messenger-all-chats">All messages</Link>
+      <Link href="/messages" className="messenger-all-chats">All messages</Link>
     </aside>
   );
 }

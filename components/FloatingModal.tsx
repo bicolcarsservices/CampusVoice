@@ -27,7 +27,7 @@ export default function FloatingModal({ children }: { children: React.ReactNode 
         className="floating-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="CampusVoice window"
+        aria-label="KanyaKanyaNa window"
         onClick={(event) => {
           if (!(event.target instanceof Element)) return;
           const anchor = event.target.closest("a[href]");

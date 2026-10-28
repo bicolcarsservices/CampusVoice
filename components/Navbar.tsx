@@ -24,7 +24,7 @@ export default async function Navbar() {
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .limit(10);
-    if (announcementsError) throw new Error(`Could not load CampusVoice announcements: ${announcementsError.message}`);
+    if (announcementsError) throw new Error(`Could not load KanyaKanyaNa announcements: ${announcementsError.message}`);
     announcements = data ?? [];
   }
 
@@ -32,7 +32,7 @@ export default async function Navbar() {
     <>
       {user && <PresenceHeartbeat />}
       {user && !isAdmin && <SubscriptionApprovalToast />}
-      <PublicNavbar signedIn={Boolean(user)} isAdmin={isAdmin} />
+      <PublicNavbar signedIn={Boolean(user)} />
       <AnnouncementDock announcements={announcements} signedIn={Boolean(user)} />
     </>
   );

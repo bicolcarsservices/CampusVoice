@@ -37,7 +37,7 @@ export default async function GamesPage() {
       title: "Campus Doodle",
       tagline: "Draw. Guess. Laugh together.",
       category: "MULTIPLAYER · DRAW & GUESS",
-      description: "Draw clues, guess with friends, and play together in real time. Free to play; no CampusVoice subscription required.",
+      description: "Draw clues, guess with friends, and play together in real time. Free to play; no KanyaKanyaNa subscription required.",
       href: "/games/campus-doodle",
       cta: "Play free",
       registerHref: undefined,
@@ -100,7 +100,7 @@ export default async function GamesPage() {
         <div className="games-arcade-orb games-arcade-orb-one" aria-hidden="true" />
         <div className="games-arcade-orb games-arcade-orb-two" aria-hidden="true" />
         <div className="games-arcade-hero-badge" aria-hidden="true">
-          <span>CV</span><i>ARCADE</i><b>✦</b>
+          <span>KK</span><i>ARCADE</i><b>✦</b>
         </div>
         <div className="games-arcade-hero-foot"><span>01</span><i /><span>PLAY · EARN · REPEAT</span></div>
       </header>

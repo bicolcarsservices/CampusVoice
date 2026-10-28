@@ -36,7 +36,7 @@ export default function NotificationSettings({
           {setupNeeded
             ? "Run the support settings migration to control notifications."
             : isEnabled
-              ? "CampusVoice can add new alerts to your notifications inbox."
+              ? "KanyaKanyaNa can add new alerts to your notifications inbox."
               : "New in-app alerts are paused. Existing alerts stay in your inbox."}
         </p>
       </div>

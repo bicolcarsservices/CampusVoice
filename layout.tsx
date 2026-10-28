@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
-  title: "CampusVoice",
-  description: "Your Voice. Your Space. Your Story.",
+  title: "KanyaKanyaNa",
+  description: "Kanya-kanyang kwento, iisang tambayan.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

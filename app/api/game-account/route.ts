@@ -35,7 +35,7 @@ export async function GET() {
     console.error("Campus Coin Rush account authentication failed", error);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });
   }
-  if (!user) return NextResponse.json({ error: "Log in to use your CampusVoice wallet in the game." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Log in to use your KanyaKanyaNa wallet in the game." }, { status: 401 });
 
   const account = await getAccount(supabase, user.id);
   if (!account) return NextResponse.json({ error: "Could not load your game wallet." }, { status: 500 });
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     console.error("Campus Coin Rush purchase authentication failed", error);
     return NextResponse.json({ error: "Could not verify your login." }, { status: 500 });
   }
-  if (!user) return NextResponse.json({ error: "Log in to use your CampusVoice wallet in the game." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Log in to use your KanyaKanyaNa wallet in the game." }, { status: 401 });
 
   let body: unknown;
   try {
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       : await supabase.rpc("equip_game_skin", { p_skin_id: parsed.data.skinId });
   if (purchaseError) {
     if (purchaseError.message.includes("INSUFFICIENT_BALANCE")) {
-      return NextResponse.json({ error: "Not enough CampusVoice wallet balance. Top up your wallet first." }, { status: 409 });
+      return NextResponse.json({ error: "Not enough KanyaKanyaNa wallet balance. Top up your wallet first." }, { status: 409 });
     }
     if (purchaseError.message.includes("INSUFFICIENT_DIAS")) {
       return NextResponse.json({ error: "Not enough Dias for this character." }, { status: 409 });
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You do not own this character." }, { status: 403 });
     }
     if (purchaseError.message.includes("ACCOUNT_NOT_ACTIVE")) {
-      return NextResponse.json({ error: "Your CampusVoice account is not active." }, { status: 403 });
+      return NextResponse.json({ error: "Your KanyaKanyaNa account is not active." }, { status: 403 });
     }
     console.error("Campus Coin Rush wallet operation failed", purchaseError);
     return NextResponse.json({ error: "Could not update the game wallet. Please try again." }, { status: 500 });
