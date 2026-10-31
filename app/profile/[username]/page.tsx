@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import PostCard from "@/components/community/PostCard";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
+import { resolveAvatarUrl } from "@/lib/avatar-presets";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +35,12 @@ export default async function PublicProfilePage({ params }: { params: { username
   if (schoolError) throw new Error(`Could not load profile school: ${schoolError.message}`);
   if (postsError) throw new Error(`Could not load public posts: ${postsError.message}`);
   if (photosError) throw new Error(`Could not load profile photos: ${photosError.message}`);
-  const avatarUrl = profile.avatar_path
-    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
-    : null;
+  const avatarUrl = resolveAvatarUrl(
+    profile.avatar_path,
+    profile.avatar_path && !profile.avatar_path.startsWith("/")
+      ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
+      : null,
+  );
   const profilePhotos = photos?.length
     ? photos.map((photo) => ({
       id: photo.id,
@@ -112,7 +116,7 @@ export default async function PublicProfilePage({ params }: { params: { username
         <p className="community-profile-username">@{profile.username}</p>
         {profile.bio && <p className="community-profile-bio">{profile.bio}</p>}
         <div className="community-profile-details">
-          <span>{profile.school_name ?? school?.name ?? "Community member"}</span>
+          {(profile.school_name || school?.name) && <span>{profile.school_name || school?.name}</span>}
           <span>Joined {new Date(profile.created_at).toLocaleDateString()}</span>
         </div>
         <dl className="community-profile-stats">
@@ -144,7 +148,7 @@ export default async function PublicProfilePage({ params }: { params: { username
                 ? supabase.storage.from("avatars").getPublicUrl(post.avatar_path).data.publicUrl
                 : null,
             }}
-            schoolName={post.school_id ? schoolNames.get(post.school_id) ?? profile.school_name ?? school?.name ?? "Community member" : profile.school_name ?? school?.name ?? "Community member"}
+            schoolName={post.school_id ? schoolNames.get(post.school_id) || profile.school_name || school?.name || null : profile.school_name || school?.name || null}
             categoryName={post.category_id ? categoryNames.get(post.category_id) ?? "Community" : "Community"}
             imageUrl={post.image_path ? supabase.storage.from("post-images").getPublicUrl(post.image_path).data.publicUrl : null}
             comments={(commentsByPost.get(post.id) ?? []).map((comment) => ({

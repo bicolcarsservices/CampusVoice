@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
+import { sendDirectMessagePush, sendGroupMessagePush } from "@/lib/web-push";
 
 export type ActionState = { error?: string; success?: string; redirectTo?: string } | null;
 
@@ -218,6 +219,7 @@ export async function sendDirectMessage(_: ActionState, formData: FormData): Pro
     if (audioPath) await result.supabase.storage.from("chat-audio").remove([audioPath]);
     return { error: actionError(error.message) };
   }
+  await sendDirectMessagePush(result.user.id, recipientId.data);
   revalidatePath("/messages");
   revalidatePath(`/messages/${recipientId.data}`);
   return { success: "Message sent." };
@@ -285,6 +287,7 @@ export async function sendGroupChatMessage(_: ActionState, formData: FormData): 
     if (audioPath) await result.supabase.storage.from("chat-audio").remove([audioPath]);
     return { error: actionError(error.message) };
   }
+  await sendGroupMessagePush(result.user.id, groupId.data);
   revalidatePath("/dating");
   revalidatePath(`/messages/group/${groupId.data}`);
   return { success: "Message sent." };

@@ -301,10 +301,16 @@ export default function ChatThread({
   }, [initialMuted]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (activeAudioRef.current.size === 0) router.refresh();
-    }, 4000);
-    return () => window.clearInterval(timer);
+    const refreshIfNeeded = () => {
+      if (document.visibilityState !== "visible" || activeAudioRef.current.size > 0) return;
+      router.refresh();
+    };
+    const timer = window.setInterval(refreshIfNeeded, 30_000);
+    document.addEventListener("visibilitychange", refreshIfNeeded);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfNeeded);
+    };
   }, [router]);
 
   useEffect(() => {

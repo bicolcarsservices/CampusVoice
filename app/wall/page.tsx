@@ -4,6 +4,7 @@ import PostCard from "@/components/community/PostCard";
 import WallFilters from "@/components/community/WallFilters";
 import WallPopupTicker from "@/components/community/WallPopupTicker";
 import { getOnlineNowCount } from "@/lib/presence";
+import { resolveAvatarUrl } from "@/lib/avatar-presets";
 
 export const dynamic = "force-dynamic";
 
@@ -138,13 +139,16 @@ export default async function Wall({ searchParams }: { searchParams?: SearchPara
           ? supabase.storage.from("post-images").getPublicUrl(post.image_path).data.publicUrl
           : null;
         const avatarUrl = post.avatar_path
-          ? supabase.storage.from("avatars").getPublicUrl(post.avatar_path).data.publicUrl
+          ? resolveAvatarUrl(
+              post.avatar_path,
+              post.avatar_path.startsWith("/") ? null : supabase.storage.from("avatars").getPublicUrl(post.avatar_path).data.publicUrl,
+            )
           : null;
         return (
           <PostCard
             key={post.id}
             post={{ ...post, avatar_path: avatarUrl }}
-            schoolName={post.school_id ? schoolNames.get(post.school_id) ?? "KanyaKanyaNa" : "KanyaKanyaNa"}
+            schoolName={post.school_id ? schoolNames.get(post.school_id) ?? null : null}
             categoryName={post.category_id ? categoryNames.get(post.category_id) ?? "Community" : "Community"}
             imageUrl={imageUrl}
             comments={(commentsByPost.get(post.id) ?? []).map((comment) => ({

@@ -28,15 +28,16 @@ export default function FloatingModal({ children }: { children: React.ReactNode 
         role="dialog"
         aria-modal="true"
         aria-label="KanyaKanyaNa window"
-        onClick={(event) => {
+        onClickCapture={(event) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           if (!(event.target instanceof Element)) return;
           const anchor = event.target.closest("a[href]");
-          if (!(anchor instanceof HTMLAnchorElement)) return;
+          if (!(anchor instanceof HTMLAnchorElement) || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
           const destination = new URL(anchor.href, window.location.href);
           const isModalRoute = /^\/(subscription|login|register|profile)(\/|$)/.test(destination.pathname);
           if (destination.origin === window.location.origin && !isModalRoute) {
             event.preventDefault();
-            window.location.assign(destination.href);
+            router.push(destination.href);
           }
         }}
       >

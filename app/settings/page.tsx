@@ -7,8 +7,10 @@ import ProfilePhotoComposer from "@/components/social/ProfilePhotoComposer";
 import SocialActionForm from "@/components/social/SocialActionForm";
 import AppearanceSettings from "@/components/AppearanceSettings";
 import NotificationSettings from "@/components/NotificationSettings";
+import PushNotificationSettings from "@/components/PushNotificationSettings";
 import { deleteProfilePhoto } from "@/server/dating-actions";
 import { logout } from "@/server/auth-actions";
+import { resolveAvatarUrl } from "@/lib/avatar-presets";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +44,12 @@ export default async function SettingsPage() {
   if (!profile) throw new Error("Your profile was not found. Please contact support.");
 
   const schoolName = profile.school_name ?? schools?.find((school) => school.id === profile.school_id)?.name ?? "No school selected";
-  const avatarUrl = profile.avatar_path
-    ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
-    : null;
+  const avatarUrl = resolveAvatarUrl(
+    profile.avatar_path,
+    profile.avatar_path && !profile.avatar_path.startsWith("/")
+      ? supabase.storage.from("avatars").getPublicUrl(profile.avatar_path).data.publicUrl
+      : null,
+  );
 
   const settingsLinks = [
     ["Profile", "#profile"],
@@ -162,6 +167,10 @@ export default async function SettingsPage() {
 
           <section id="notifications" className="settings-section">
             <NotificationSettings enabled={notificationPreference !== false} setupNeeded={notificationSettingsNeedSetup} />
+            <PushNotificationSettings
+              setupNeeded={!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY ||
+                !process.env.VAPID_SUBJECT || !process.env.SUPABASE_SERVICE_ROLE_KEY}
+            />
             <Link href="/notifications" className="btn-ghost settings-inbox-link">View notification inbox <span aria-hidden="true">→</span></Link>
           </section>
 

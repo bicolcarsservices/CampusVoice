@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { parsePhpAmount, parsePhpDeduction } from "@/lib/wallet";
+import { sendApprovedWallPostPush, sendPushToAllUsers } from "@/lib/web-push";
 
 const uuid = z.string().uuid();
 
@@ -23,10 +24,16 @@ export async function adminSetPostStatus(formData: FormData) {
   const status = z.enum(["pending", "approved", "rejected", "flagged", "hidden", "removed"]).safeParse(formData.get("status"));
   const reason = z.string().trim().max(500).safeParse(formData.get("reason") ?? "");
   if (!postId.success || !status.success || !reason.success) return { error: "Invalid moderation request." };
+  const { data: previousPost, error: previousPostError } = await supabase.from("admin_posts")
+    .select("status").eq("id", postId.data).maybeSingle();
+  if (previousPostError) return { error: `Could not load post status: ${previousPostError.message}` };
   const { error } = await supabase.rpc("admin_set_post_status", {
     p_post: postId.data, p_status: status.data, p_reason: reason.data || null,
   });
   if (error) return { error: `Could not update post: ${error.message}` };
+  if (status.data === "approved" && previousPost?.status !== "approved") {
+    await sendApprovedWallPostPush(postId.data);
+  }
   revalidatePath("/admin");
   revalidatePath("/admin/posts");
   revalidatePath("/wall");
@@ -426,6 +433,13 @@ export async function saveAnnouncement(formData: FormData) {
   const body = z.string().trim().min(1).max(2000).safeParse(formData.get("body"));
   const published = formData.get("is_published") === "true";
   if ((id && !id.success) || !title.success || !body.success) return { error: "Check the announcement and try again." };
+  let shouldNotify = !id && published;
+  if (id?.success) {
+    const { data: existing, error } = await supabase.from("announcements")
+      .select("is_published").eq("id", id.data).maybeSingle();
+    if (error) return { error: `Could not load announcement: ${error.message}` };
+    shouldNotify = Boolean(published && existing && !existing.is_published);
+  }
 
   const mutation = id
     ? await supabase.from("announcements").update({ title: title.data, body: body.data, is_published: published }).eq("id", id.data)
@@ -434,6 +448,13 @@ export async function saveAnnouncement(formData: FormData) {
         created_by: (await getAuthUser(supabase)).user?.id,
       });
   if (mutation.error) return { error: `Could not save announcement: ${mutation.error.message}` };
+  if (shouldNotify) {
+    await sendPushToAllUsers({
+      title: title.data,
+      body: body.data.slice(0, 180),
+      url: "/",
+    });
+  }
   revalidatePath("/admin/announcements");
   revalidatePath("/");
   revalidatePath("/wall");

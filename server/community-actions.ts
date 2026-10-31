@@ -2,10 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 import { createClient, getAuthUser } from "@/lib/supabase/server";
 import { resolveSchoolName } from "@/lib/schools";
 import { parsePhpAmount } from "@/lib/wallet";
+import { AVATAR_PRESET_OPTIONS } from "@/lib/avatar-presets";
+import { sendApprovedWallPostPush } from "@/lib/web-push";
 
 const uuidSchema = z.string().uuid();
 const contentSchema = z.string().trim().min(1).max(2000);
@@ -48,11 +52,25 @@ export async function createPost(_: ActionState, formData: FormData): Promise<Ac
 
   const content = contentSchema.safeParse(formData.get("content"));
   const categoryId = formData.get("category_id");
-  const schoolId = formData.get("school_id");
+  const schoolSelection = formData.get("school_id");
+  if (schoolSelection !== null && typeof schoolSelection !== "string") return { error: "Choose a valid school." };
+  const selectedSchool = typeof schoolSelection === "string" ? schoolSelection : "";
+  let schoolId: string | null = null;
   const anonymous = formData.get("is_anonymous") === "true";
   if (!content.success) return { error: "Write a post of 1 to 2,000 characters." };
   if (categoryId && !uuidSchema.safeParse(categoryId).success) return { error: "Choose a valid category." };
-  if (schoolId && !uuidSchema.safeParse(schoolId).success) return { error: "Choose a valid school." };
+  if (selectedSchool === "profile") {
+    const { data: profile, error: profileError } = await result.supabase
+      .from("profiles")
+      .select("school_id")
+      .eq("id", result.user.id)
+      .maybeSingle();
+    if (profileError || !profile) return { error: "Could not load your profile school." };
+    schoolId = profile.school_id;
+  } else if (selectedSchool && selectedSchool !== "none") {
+    if (!uuidSchema.safeParse(selectedSchool).success) return { error: "Choose a valid school." };
+    schoolId = selectedSchool;
+  }
 
   const image = formData.get("image");
   let imagePath: string | null = null;
@@ -73,10 +91,10 @@ export async function createPost(_: ActionState, formData: FormData): Promise<Ac
     if (uploadError) return { error: `Image upload failed: ${uploadError.message}` };
   }
 
-  const { error } = await result.supabase.rpc("create_post", {
+  const { data: postId, error } = await result.supabase.rpc("create_post", {
     p_content: content.data,
     p_category_id: categoryId || null,
-    p_school_id: schoolId || null,
+    p_school_id: schoolId,
     p_is_anonymous: anonymous,
     p_image_path: imagePath,
   });
@@ -92,6 +110,7 @@ export async function createPost(_: ActionState, formData: FormData): Promise<Ac
     return { error: `Could not publish your post: ${error.message}` };
   }
 
+  if (typeof postId === "string") await sendApprovedWallPostPush(postId);
   revalidatePath("/wall");
   revalidatePath("/profile");
   redirect("/wall?posted=1");
@@ -332,9 +351,12 @@ export async function updateProfile(_: ActionState, formData: FormData): Promise
   const schoolName = z.string().trim().max(100).safeParse(formData.get("school_name") ?? "");
   const gradeLevel = z.string().trim().max(30).safeParse(formData.get("grade_level") ?? "");
   const bio = z.string().trim().max(300).safeParse(formData.get("bio") ?? "");
-  if (!displayName.success || !username.success || !schoolName.success || !gradeLevel.success || !bio.success) {
+  const presetId = z.string().trim().safeParse(formData.get("avatar_preset") ?? "");
+  if (!displayName.success || !username.success || !schoolName.success || !gradeLevel.success || !bio.success || !presetId.success) {
     return { error: "Check your profile fields and try again." };
   }
+
+  const selectedPreset = presetId.data ? AVATAR_PRESET_OPTIONS.find((option) => option.id === presetId.data) ?? null : null;
 
   const { data: schools, error: schoolsError } = schoolName.data
     ? await result.supabase.from("schools").select("id,name").eq("is_active", true)
@@ -361,6 +383,16 @@ export async function updateProfile(_: ActionState, formData: FormData): Promise
     newAvatarPath = `${result.user.id}/${crypto.randomUUID()}.${extension}`;
     const { error: uploadError } = await result.supabase.storage
       .from("avatars").upload(newAvatarPath, image, { contentType: image.type, upsert: false });
+    if (uploadError) return { error: `Avatar upload failed: ${uploadError.message}` };
+    avatarPath = newAvatarPath;
+  } else if (selectedPreset) {
+    const presetFileName = `${selectedPreset.id}.png`;
+    const presetAbsolutePath = path.join(process.cwd(), "public", "avatars-pack", "avatars", presetFileName);
+    const presetBytes = await readFile(presetAbsolutePath);
+    newAvatarPath = `${result.user.id}/${presetFileName}`;
+    const { error: uploadError } = await result.supabase.storage
+      .from("avatars")
+      .upload(newAvatarPath, presetBytes, { contentType: "image/png", upsert: true });
     if (uploadError) return { error: `Avatar upload failed: ${uploadError.message}` };
     avatarPath = newAvatarPath;
   } else if (formData.get("remove_avatar") === "true") {

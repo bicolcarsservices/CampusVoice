@@ -23,9 +23,11 @@ type ComposerTool = "photo" | "category" | "school" | "identity";
 export default function PostComposer({
   categories,
   schools,
+  profileSchoolId,
 }: {
   categories: Option[];
   schools: Option[];
+  profileSchoolId: string | null;
 }) {
   const [state, action] = useFormState(createPost, null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
@@ -115,8 +117,11 @@ export default function PostComposer({
         <div className="post-composer-tool-panel" hidden={activeTool !== "school"}>
           <label className="block text-sm font-medium">
             School
-            <select name="school_id" className="input mt-2" defaultValue="">
-              <option value="">Use my profile school</option>
+            <select name="school_id" className="input mt-2" defaultValue={profileSchoolId ? "profile" : "none"}>
+              <option value="none">No school</option>
+              <option value="profile" disabled={!profileSchoolId}>
+                {profileSchoolId ? "Use my profile school" : "No school set on my profile"}
+              </option>
               {schools.map((school) => (
                 <option key={school.id} value={school.id}>{school.name}</option>
               ))}

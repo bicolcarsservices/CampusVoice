@@ -180,6 +180,14 @@ create table if not exists public.notifications (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.push_subscriptions (
+  endpoint text primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.announcements (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -245,6 +253,7 @@ create index if not exists reports_status_idx on public.reports (status, created
 create index if not exists reports_post_idx on public.reports (post_id);
 
 create index if not exists notifications_user_idx on public.notifications (user_id, is_read, created_at desc);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
 create index if not exists logs_created_idx on public.moderation_logs (created_at desc);
 create index if not exists logs_admin_idx on public.moderation_logs (admin_id, created_at desc);
 
@@ -332,7 +341,6 @@ begin
   if p_category_id is not null and not exists (select 1 from public.categories where id = p_category_id and is_active) then
     raise exception 'INVALID_CATEGORY';
   end if;
-  p_school_id := coalesce(p_school_id, prof.school_id);
   if p_school_id is not null and not exists (select 1 from public.schools where id = p_school_id and is_active) then
     raise exception 'INVALID_SCHOOL';
   end if;
@@ -875,6 +883,7 @@ alter table public.reactions enable row level security;
 alter table public.bookmarks enable row level security;
 alter table public.reports enable row level security;
 alter table public.notifications enable row level security;
+alter table public.push_subscriptions enable row level security;
 alter table public.announcements enable row level security;
 alter table public.moderation_logs enable row level security;
 alter table public.daily_post_usage enable row level security;
@@ -890,7 +899,7 @@ begin
       and tablename = any (array[
         'schools', 'categories', 'website_settings', 'profiles', 'admin_users',
         'subscription_plans', 'subscription_features', 'subscriptions', 'posts',
-        'comments', 'reactions', 'bookmarks', 'reports', 'notifications',
+        'comments', 'reactions', 'bookmarks', 'reports', 'notifications', 'push_subscriptions',
         'announcements', 'moderation_logs', 'daily_post_usage'
       ])
   loop
@@ -966,6 +975,9 @@ create policy notifications_read on public.notifications for select using (user_
 create policy notifications_update on public.notifications for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy notifications_delete on public.notifications for delete using (user_id = auth.uid());
 
+-- Push subscription endpoints are only accessed server-side with the service role.
+revoke all on public.push_subscriptions from public, anon, authenticated;
+
 -- usage + audit trail
 create policy usage_read on public.daily_post_usage for select using (user_id = auth.uid() or public.is_admin());
 create policy logs_read on public.moderation_logs for select using (public.is_admin());
@@ -977,14 +989,14 @@ revoke insert, update, delete, truncate, references, trigger on
   public.schools, public.categories, public.website_settings, public.profiles,
   public.admin_users, public.subscription_plans, public.subscription_features,
   public.subscriptions, public.posts, public.comments, public.reactions,
-  public.bookmarks, public.reports, public.notifications, public.announcements,
+  public.bookmarks, public.reports, public.notifications, public.push_subscriptions, public.announcements,
   public.moderation_logs, public.daily_post_usage
 from public, anon;
 revoke truncate, references, trigger on
   public.schools, public.categories, public.website_settings, public.profiles,
   public.admin_users, public.subscription_plans, public.subscription_features,
   public.subscriptions, public.posts, public.comments, public.reactions,
-  public.bookmarks, public.reports, public.notifications, public.announcements,
+  public.bookmarks, public.reports, public.notifications, public.push_subscriptions, public.announcements,
   public.moderation_logs, public.daily_post_usage
 from public, authenticated;
 
@@ -1089,10 +1101,10 @@ begin
   create policy cv_public_read on storage.objects for select
     using (bucket_id in ('avatars','school-logos','brand-assets','game-logos','post-images'));
 
-  -- avatar upload requires the 'custom_avatar' feature (Basic/Premium); files live in /<user id>/...
+  -- avatars are stored per user and are allowed for any active account, including preset selections
   create policy cv_avatar_insert on storage.objects for insert to authenticated
     with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text
-                and public.has_feature(auth.uid(), 'custom_avatar'));
+                and public.is_active_user());
   create policy cv_avatar_delete on storage.objects for delete to authenticated
     using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
 
@@ -1160,10 +1172,8 @@ insert into public.categories (name, sort_order) values
   ('Appreciation',6),('Achievement',7),('School Life',8),('Random Thoughts',9),('Other',10)
 on conflict (name) do nothing;
 
-insert into public.schools (name, location, description) values
-  ('Demo School A', 'Demo City', 'SAMPLE DATA - replace in Admin'),
-  ('Demo School B', 'Demo City', 'SAMPLE DATA - replace in Admin')
-on conflict (name) do nothing;
+delete from public.schools
+where name in ('Demo School A', 'Demo School B');
 
 -- ---------------------------------------------------------------------
 -- 12. AUTO-EXPIRE SUBSCRIPTIONS (pg_cron; skipped with a notice if unavailable)

@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { addComment, reportContent, toggleReaction } from "@/server/community-actions";
 import DeleteCommentForm from "@/components/community/DeleteCommentForm";
+import { getAnonymousAvatar, getAnonymousName } from "@/lib/avatar-presets";
 
 type CommentItem = {
   id: string;
@@ -89,7 +90,7 @@ export default function PostCard({
   reactionKind,
 }: {
   post: Post;
-  schoolName: string;
+  schoolName: string | null;
   categoryName: string;
   imageUrl: string | null;
   comments: CommentItem[];
@@ -103,7 +104,9 @@ export default function PostCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const selectedReaction = postReactions.find((reaction) => reaction.kind === reactionKind);
-  const name = post.is_anonymous ? "Anonymous" : post.display_name || post.username || "Community member";
+  const anonymousName = getAnonymousName(post.id);
+  const name = post.is_anonymous ? anonymousName : post.display_name || post.username || "Community member";
+  const avatarSrc = post.is_anonymous ? getAnonymousAvatar(post.id) : post.avatar_path;
 
   async function sharePost() {
     const url = `${window.location.origin}/wall#post-${post.id}`;
@@ -136,17 +139,17 @@ export default function PostCard({
     <article id={`post-${post.id}`} className="card feed-post-card space-y-4">
       <header className="feed-post-header flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          {post.is_anonymous || !post.avatar_path ? (
-            <div className={`avatar-fallback feed-post-avatar${post.is_anonymous ? " feed-post-avatar-anonymous" : ""}`} aria-hidden="true">{post.is_anonymous ? "?" : name.slice(0, 1).toUpperCase()}</div>
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="" className="avatar-fallback feed-post-avatar object-cover" />
           ) : (
-            <img src={post.avatar_path} alt="" className="avatar-fallback feed-post-avatar object-cover" />
+            <div className={`avatar-fallback feed-post-avatar${post.is_anonymous ? " feed-post-avatar-anonymous" : ""}`} aria-hidden="true">{post.is_anonymous ? "?" : name.slice(0, 1).toUpperCase()}</div>
           )}
           <div className="feed-post-author-block min-w-0">
             <p className="feed-post-author truncate font-semibold">
               {post.is_anonymous || !post.username ? name : <Link href={`/profile/${encodeURIComponent(post.username)}`} className="hover:text-brand">{name}</Link>}
             </p>
             <p className="feed-post-meta text-xs text-slate-500">
-              {schoolName} · {new Date(post.created_at).toLocaleString()}
+              {schoolName ? `${schoolName} · ` : ""}{new Date(post.created_at).toLocaleString()}
             </p>
           </div>
         </div>
@@ -157,7 +160,7 @@ export default function PostCard({
 
       {imageUrl && <img src={imageUrl} alt="Image attached to post" className="post-image feed-post-image" />}
       <p className="feed-post-content whitespace-pre-wrap break-words">
-        <strong className="feed-post-caption-author">{name}</strong>{" "}{post.content}
+        {post.content}
       </p>
 
       <div className="feed-post-actions">

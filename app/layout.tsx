@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: "KanyaKanyaNa",
   description: "Kanya-kanyang kwento, iisang tambayan. I-share ang campus life mo sa KanyaKanyaNa.",
   icons: { icon: "/kanyakanyana-mark.svg" },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "KanyaKanyaNa", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

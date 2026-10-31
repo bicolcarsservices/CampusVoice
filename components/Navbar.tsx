@@ -11,19 +11,23 @@ export default async function Navbar() {
   let announcements: PublicAnnouncement[] = [];
   if (hasSupabaseConfig()) {
     const supabase = createClient();
-    const { user: sessionUser, error } = await getAuthUser(supabase);
+    const [
+      { user: sessionUser, error },
+      { data: adminAccess, error: adminError },
+      { data, error: announcementsError },
+    ] = await Promise.all([
+      getAuthUser(supabase),
+      supabase.rpc("is_admin"),
+      supabase.from("announcements")
+        .select("id,title,body")
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
+        .limit(10),
+    ]);
     if (error) console.error("Could not verify the signed-in user for navigation.", error);
     user = sessionUser;
-    if (user) {
-      const { data: adminAccess, error: adminError } = await supabase.rpc("is_admin");
-      if (adminError) console.error("Could not verify administrator access for navigation.", adminError);
-      else isAdmin = adminAccess === true;
-    }
-    const { data, error: announcementsError } = await supabase.from("announcements")
-      .select("id,title,body")
-      .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(10);
+    if (user && adminError) console.error("Could not verify administrator access for navigation.", adminError);
+    else isAdmin = Boolean(user && adminAccess === true);
     if (announcementsError) throw new Error(`Could not load KanyaKanyaNa announcements: ${announcementsError.message}`);
     announcements = data ?? [];
   }

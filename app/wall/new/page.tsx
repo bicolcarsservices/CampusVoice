@@ -8,16 +8,18 @@ export default async function NewPostPage() {
   const { supabase, user, error: authError } = await getAuthUser(createClient());
   if (authError || !user) redirect("/login");
 
-  const [{ data: categories, error: categoriesError }, { data: schools, error: schoolsError }] = await Promise.all([
+  const [{ data: categories, error: categoriesError }, { data: schools, error: schoolsError }, { data: profile, error: profileError }] = await Promise.all([
     supabase.from("categories").select("id,name").eq("is_active", true).order("sort_order"),
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
+    supabase.from("profiles").select("school_id").eq("id", user.id).maybeSingle(),
   ]);
   if (categoriesError) throw new Error(`Could not load categories: ${categoriesError.message}`);
   if (schoolsError) throw new Error(`Could not load schools: ${schoolsError.message}`);
+  if (profileError) throw new Error(`Could not load your profile school: ${profileError.message}`);
 
   return (
     <section className="post-composer-page">
-      <PostComposer categories={categories ?? []} schools={schools ?? []} />
+      <PostComposer categories={categories ?? []} schools={schools ?? []} profileSchoolId={profile?.school_id ?? null} />
     </section>
   );
 }

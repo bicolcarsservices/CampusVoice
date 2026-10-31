@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateProfile } from "@/server/community-actions";
+import { AVATAR_PRESET_OPTIONS } from "@/lib/avatar-presets";
 
 type Option = { id: string; name: string };
 
@@ -20,13 +22,36 @@ export default function ProfileForm({
   avatarUrl: string | null;
 }) {
   const [state, action] = useFormState(updateProfile, null);
+  const [selectedPreset, setSelectedPreset] = useState(
+    AVATAR_PRESET_OPTIONS.find((option) => option.src === avatarUrl)?.id ?? "",
+  );
+
   return (
     <form action={action} className="card settings-edit-form">
       <h2 className="text-xl font-bold">Edit profile</h2>
       {avatarUrl && <img src={avatarUrl} alt="Your profile avatar" className="avatar-fallback settings-edit-avatar h-20 w-20 object-cover" />}
+      <input type="hidden" name="avatar_preset" value={selectedPreset} />
+      <div className="settings-form-field settings-form-field-wide">
+        <p className="mb-2 text-sm font-medium">Choose a profile avatar</p>
+        <div className="flex flex-wrap gap-3">
+          {AVATAR_PRESET_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setSelectedPreset(option.id)}
+              className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 transition ${selectedPreset === option.id ? "border-brand ring-2 ring-brand/30" : "border-slate-200 hover:border-brand/60"}`}
+              aria-label={option.label}
+              aria-pressed={selectedPreset === option.id}
+              title={option.label}
+            >
+              <img src={option.src} alt={option.label} className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </div>
       <label className="settings-form-field settings-form-field-wide block text-sm font-medium">Profile picture
         <input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" className="input mt-1" />
-        <span className="mt-1 block text-xs text-slate-500">JPG, PNG, or WebP; maximum 2 MB. Custom avatars require an eligible plan.</span>
+        <span className="mt-1 block text-xs text-slate-500">JPG, PNG, or WebP; maximum 2 MB.</span>
       </label>
       {avatarUrl && (
         <label className="flex items-center gap-2 text-sm">
