@@ -17,6 +17,15 @@ the profile, and names matching an existing school are also linked to that
 school for feed filters and counts. Review the SQL output for errors before
 using updated features.
 
+## Profile gender field
+
+After updating the app to a version that includes gender in registration and
+profile settings, run `supabase/profile-gender.sql` in the Supabase SQL Editor.
+This adds the `profiles.gender` column and updates the registration trigger and
+profile update permissions. If Settings reports that `profiles.gender` does not
+exist, this migration has not yet been applied to the configured Supabase
+project.
+
 ## School, login, and game logos
 
 The schema creates the public school-logo, brand-assets, and game-logos

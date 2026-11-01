@@ -5,12 +5,16 @@ import AnnouncementDock, { type PublicAnnouncement } from "@/components/Announce
 import PresenceHeartbeat from "@/components/social/PresenceHeartbeat";
 import SubscriptionApprovalToast from "@/components/SubscriptionApprovalToast";
 import SubscriptionPaymentStatus from "@/components/SubscriptionPaymentStatus";
+import WalletTopupStatus, { type WalletTopupRequest } from "@/components/WalletTopupStatus";
+import WalletWithdrawalStatus, { type WalletWithdrawalRequest } from "@/components/WalletWithdrawalStatus";
 
 export default async function Navbar() {
   let user: User | null = null;
   let isAdmin = false;
   let announcements: PublicAnnouncement[] = [];
   let paymentStatusError = false;
+  let latestTopupRequest: WalletTopupRequest | null = null;
+  let latestWithdrawalRequest: WalletWithdrawalRequest | null = null;
   let latestPaymentRequest: {
     id: string;
     status: string;
@@ -64,6 +68,34 @@ export default async function Navbar() {
           paymentReference: paymentRequest.payment_reference,
         };
       }
+      const { data: topupRequest, error: topupRequestError } = await supabase.from("wallet_topup_requests")
+        .select("id,amount_centavos,received_centavos,fee_centavos,credited_centavos,status,payment_reference,review_note,created_at,reviewed_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (topupRequestError) {
+        console.error("Could not load wallet top-up status for navigation.", topupRequestError);
+      } else if (topupRequest) {
+        latestTopupRequest = {
+          ...topupRequest,
+          status: topupRequest.status as WalletTopupRequest["status"],
+        };
+      }
+      const { data: withdrawalRequest, error: withdrawalRequestError } = await supabase.from("wallet_withdrawal_requests")
+        .select("id,amount_centavos,payout_method,status,review_note,created_at,reviewed_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (withdrawalRequestError) {
+        console.error("Could not load wallet withdrawal status for navigation.", withdrawalRequestError);
+      } else if (withdrawalRequest) {
+        latestWithdrawalRequest = {
+          ...withdrawalRequest,
+          status: withdrawalRequest.status as WalletWithdrawalRequest["status"],
+        };
+      }
     }
   }
 
@@ -72,6 +104,8 @@ export default async function Navbar() {
       {user && <PresenceHeartbeat />}
       {user && !isAdmin && <SubscriptionApprovalToast />}
       {user && <SubscriptionPaymentStatus initialRequest={latestPaymentRequest} />}
+      {user && latestTopupRequest && <WalletTopupStatus initialRequest={latestTopupRequest} />}
+      {user && latestWithdrawalRequest && <WalletWithdrawalStatus initialRequest={latestWithdrawalRequest} />}
       {user && paymentStatusError && (
         <p
           role="status"
