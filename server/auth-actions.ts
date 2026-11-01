@@ -11,6 +11,7 @@ const registerSchema = z.object({
   username: z.string().regex(/^[a-zA-Z0-9_]{3,20}$/, "3-20 letters, numbers or _"),
   email: z.string().email(),
   password: z.string().min(8, "At least 8 characters"),
+  gender: z.enum(["male", "female"]),
   school_name: z.string().trim().max(100).optional().default(""),
   grade_level: z.string().trim().min(1).max(30),
   next: z.string().optional(),
@@ -82,6 +83,7 @@ export async function register(_: unknown, fd: FormData) {
       data: {
         full_name: meta.full_name,
         username: meta.username,
+        gender: meta.gender,
         grade_level: meta.grade_level,
         school_id: school.schoolId,
         school_name: school.schoolName,

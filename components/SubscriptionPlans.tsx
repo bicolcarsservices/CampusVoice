@@ -27,9 +27,17 @@ export default async function SubscriptionPlans({
   if (featuresError) throw new Error(`Could not load plan features: ${featuresError.message}`);
   if (subscriptionError) throw new Error(`Could not load subscription status: ${subscriptionError.message}`);
   const { data: trial, error: trialError } = user
-    ? await supabase.from("subscription_trials").select("expires_at").eq("user_id", user.id).maybeSingle()
+    ? await supabase.from("subscription_trials").select("subscription_id,expires_at").eq("user_id", user.id).maybeSingle()
     : { data: null, error: null };
-  const trialActive = Boolean(trial && new Date(trial.expires_at).getTime() > Date.now());
+  const { data: trialSubscription, error: trialSubscriptionError } = trial
+    ? await supabase.from("subscriptions").select("status").eq("id", trial.subscription_id).maybeSingle()
+    : { data: null, error: null };
+  const trialUsed = Boolean(trial);
+  const trialActive = Boolean(
+    trial &&
+    trialSubscription?.status === "active" &&
+    new Date(trial.expires_at).getTime() > Date.now()
+  );
   const hasActiveSubscription = subscription?.status === "basic" || subscription?.status === "premium";
 
   return (
@@ -58,10 +66,16 @@ export default async function SubscriptionPlans({
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose a plan below to start a new subscription.</p>
         </aside>
       )}
-      {user && trialError && (
+      {user && (trialError || trialSubscriptionError) && (
         <aside role="alert" className="card border-amber-300 bg-amber-50 text-amber-950">
           <h2 className="font-bold">The free trial is temporarily unavailable</h2>
           <p className="mt-1 text-sm">We could not verify trial eligibility. Paid plans remain available. If this is a new setup, run <code>supabase/subscription-trials.sql</code> in the Supabase SQL Editor.</p>
+        </aside>
+      )}
+      {user && trialUsed && !trialActive && (
+        <aside className="card">
+          <h2 className="font-bold">Your one-time free trial has ended</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">A cancelled or expired trial cannot be started again on this account. You can still request a paid plan below.</p>
         </aside>
       )}
       {typeof searchParams?.intent_id === "string" && (
@@ -98,7 +112,7 @@ export default async function SubscriptionPlans({
                 <TrialStatus text={`Your trial is active until ${new Date(trial.expires_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}.`} />
               ) : user && subscription?.status === "pending" ? (
                 <TrialStatus text="Resolve your pending subscription request before starting a trial." />
-              ) : user && !trialError && !trial && !hasActiveSubscription && (plan.code === "basic" || plan.code === "premium") ? (
+              ) : user && !trialError && !trialSubscriptionError && !trialUsed && !hasActiveSubscription && (plan.code === "basic" || plan.code === "premium") ? (
                 <PlanTrialForm planCode={plan.code} />
               ) : user ? (
                 <PlanRequestForm

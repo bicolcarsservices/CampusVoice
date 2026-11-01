@@ -27,7 +27,10 @@ const reasons = [
   "other",
 ] as const;
 
-export type ActionState = { error?: string; success?: string } | null;
+export type ActionState = {
+  error?: string;
+  success?: string;
+} | null;
 
 async function getActiveUser() {
   const { supabase, user, error } = await getAuthUser(createClient());
@@ -225,20 +228,21 @@ export async function createSubscriptionRequest(_: ActionState, formData: FormDa
   const paymentReference = z.string().trim().min(1).max(100).safeParse(formData.get("payment_reference"));
   if (!paymentReference.success) return { error: "Enter the Maya payment reference or sender name." };
 
-  const { error } = await result.supabase.from("subscriptions").insert({
+  const { data: request, error } = await result.supabase.from("subscriptions").insert({
     user_id: result.user.id,
     plan_id: planId.data,
     status: "pending",
     payment_method: "maya",
     payment_reference: paymentReference.data,
-  });
+  }).select("id").single();
   if (error) {
     if (error.code === "23505") return { error: "You already have a pending subscription request." };
     return { error: `Could not submit request: ${error.message}` };
   }
 
   revalidatePath("/subscription");
-  return { success: "Payment request sent. Your plan will activate after an administrator verifies your Maya payment." };
+  revalidatePath("/");
+  redirect(`/subscription/status/${request.id}`);
 }
 
 export async function startSubscriptionTrial(_: ActionState, formData: FormData): Promise<ActionState> {
@@ -348,11 +352,12 @@ export async function updateProfile(_: ActionState, formData: FormData): Promise
 
   const displayName = z.string().trim().min(2).max(60).safeParse(formData.get("display_name"));
   const username = z.string().regex(/^[a-zA-Z0-9_]{3,20}$/).safeParse(formData.get("username"));
+  const gender = z.enum(["male", "female"]).safeParse(formData.get("gender"));
   const schoolName = z.string().trim().max(100).safeParse(formData.get("school_name") ?? "");
   const gradeLevel = z.string().trim().max(30).safeParse(formData.get("grade_level") ?? "");
   const bio = z.string().trim().max(300).safeParse(formData.get("bio") ?? "");
   const presetId = z.string().trim().safeParse(formData.get("avatar_preset") ?? "");
-  if (!displayName.success || !username.success || !schoolName.success || !gradeLevel.success || !bio.success || !presetId.success) {
+  if (!displayName.success || !username.success || !gender.success || !schoolName.success || !gradeLevel.success || !bio.success || !presetId.success) {
     return { error: "Check your profile fields and try again." };
   }
 
@@ -402,6 +407,7 @@ export async function updateProfile(_: ActionState, formData: FormData): Promise
   const { error } = await result.supabase.from("profiles").update({
     display_name: displayName.data,
     username: username.data,
+    gender: gender.data,
     school_id: school.schoolId,
     school_name: school.schoolName,
     grade_level: gradeLevel.data || null,

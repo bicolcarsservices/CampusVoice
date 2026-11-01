@@ -16,6 +16,14 @@ export default function RegisterForm({ schools, next }: { schools: { id: string;
       <label className="block text-sm">Username<input name="username" required className="input mt-1" /></label>
       <label className="block text-sm">Email<input name="email" type="email" required className="input mt-1" /></label>
       <label className="block text-sm">Password<input name="password" type="password" required minLength={8} className="input mt-1" /></label>
+      <label className="block text-sm">Gender
+        <select name="gender" required defaultValue="" className="input mt-1">
+          <option value="" disabled>Select gender</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+        <span className="mt-1 block text-xs text-slate-500">This is private and will not appear on your public profile.</span>
+      </label>
       <label className="block text-sm">School <span className="text-slate-500">(optional)</span>
         <input name="school_name" list="registration-schools" maxLength={100} className="input mt-1" placeholder="Type your school or leave blank" />
         <datalist id="registration-schools">

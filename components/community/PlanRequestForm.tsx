@@ -31,7 +31,6 @@ export default function PlanRequestForm({
   const [step, setStep] = useState<"closed" | "details" | "payment">("closed");
   const [portalReady, setPortalReady] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
-  const [submittedAt, setSubmittedAt] = useState<Date | null>(null);
   const [state, action] = useFormState(createSubscriptionRequest, null);
 
   useEffect(() => {
@@ -40,8 +39,8 @@ export default function PlanRequestForm({
 
   return (
     <div className="mt-4 space-y-3">
-      <button type="button" onClick={() => setStep(state?.success ? "payment" : "details")} className="btn-primary w-full">
-        {state?.success ? "View payment status" : "Get Plan"}
+      <button type="button" onClick={() => setStep("details")} className="btn-primary w-full">
+        Get Plan
       </button>
       {portalReady && step !== "closed" && createPortal(
         <div className="plan-detail-backdrop">
@@ -89,26 +88,6 @@ export default function PlanRequestForm({
                 <p className="plan-detail-footnote">Payment is reviewed by the KanyaKanyaNa team before activation.</p>
               </>
             ) : (
-              state?.success ? (
-                <section className="payment-confirmation" role="status" aria-labelledby={`payment-confirmation-title-${planId}`}>
-                  <span className="payment-confirmation-icon" aria-hidden="true">⌛</span>
-                  <p className="eyebrow">PAYMENT REQUEST RECEIVED</p>
-                  <h2 id={`payment-confirmation-title-${planId}`}>Waiting for approval</h2>
-                  <p className="payment-confirmation-amount">₱{pricePhp.toLocaleString("en-PH")}</p>
-                  <dl className="payment-confirmation-details">
-                    <div><dt>Plan</dt><dd>{planName}</dd></div>
-                    <div><dt>Payment method</dt><dd>Maya</dd></div>
-                    <div><dt>Reference</dt><dd>{paymentReference}</dd></div>
-                    {submittedAt && <div><dt>Submitted</dt><dd>{submittedAt.toLocaleString("en-PH")}</dd></div>}
-                  </dl>
-                  <p className="payment-confirmation-note">
-                    Your payment details were sent to the KanyaKanyaNa team. Your plan will activate after an administrator verifies the payment.
-                  </p>
-                  <button type="button" className="btn-primary payment-confirmation-done" onClick={() => setStep("closed")}>
-                    Done
-                  </button>
-                </section>
-              ) : (
                 <section className="mt-4 space-y-3">
                   <div className="payment-step-heading">
                     <p className="eyebrow">Secure your campus plan</p>
@@ -122,7 +101,7 @@ export default function PlanRequestForm({
                       Scan the QR in Maya and send the exact amount. Payment is not detected automatically; your plan activates after an administrator confirms the payment.
                     </p>
                   </div>
-                  <form action={action} onSubmit={() => setSubmittedAt(new Date())} className="space-y-2">
+                  <form action={action} className="space-y-2">
                     <input type="hidden" name="plan_id" value={planId} />
                     <label className="block text-xs text-slate-500">
                       Maya payment reference or sender name
@@ -132,7 +111,6 @@ export default function PlanRequestForm({
                     <span className="plan-request-button"><RequestButton /></span>
                   </form>
                 </section>
-              )
             )}
           </section>
         </div>,

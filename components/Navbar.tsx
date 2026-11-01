@@ -4,11 +4,20 @@ import PublicNavbar from "@/components/PublicNavbar";
 import AnnouncementDock, { type PublicAnnouncement } from "@/components/AnnouncementDock";
 import PresenceHeartbeat from "@/components/social/PresenceHeartbeat";
 import SubscriptionApprovalToast from "@/components/SubscriptionApprovalToast";
+import SubscriptionPaymentStatus from "@/components/SubscriptionPaymentStatus";
 
 export default async function Navbar() {
   let user: User | null = null;
   let isAdmin = false;
   let announcements: PublicAnnouncement[] = [];
+  let latestPaymentRequest: {
+    id: string;
+    status: string;
+    planName: string;
+    amount: number;
+    createdAt: string;
+    paymentReference: string | null;
+  } | null = null;
   if (hasSupabaseConfig()) {
     const supabase = createClient();
     const [
@@ -30,12 +39,36 @@ export default async function Navbar() {
     else isAdmin = Boolean(user && adminAccess === true);
     if (announcementsError) throw new Error(`Could not load KanyaKanyaNa announcements: ${announcementsError.message}`);
     announcements = data ?? [];
+    if (user) {
+      const { data: paymentRequest, error: paymentRequestError } = await supabase.from("subscriptions")
+        .select("id,status,created_at,payment_method,payment_reference,subscription_plans(name,price_php)")
+        .eq("user_id", user.id)
+        .in("payment_method", ["maya", "gcash"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (paymentRequestError) throw new Error(`Could not load payment status: ${paymentRequestError.message}`);
+      if (paymentRequest) {
+        const plan = Array.isArray(paymentRequest.subscription_plans)
+          ? paymentRequest.subscription_plans[0]
+          : paymentRequest.subscription_plans;
+        latestPaymentRequest = {
+          id: paymentRequest.id,
+          status: paymentRequest.status,
+          planName: plan?.name ?? "CampusVoice",
+          amount: Number(plan?.price_php ?? 0),
+          createdAt: paymentRequest.created_at,
+          paymentReference: paymentRequest.payment_reference,
+        };
+      }
+    }
   }
 
   return (
     <>
       {user && <PresenceHeartbeat />}
       {user && !isAdmin && <SubscriptionApprovalToast />}
+      {user && <SubscriptionPaymentStatus initialRequest={latestPaymentRequest} />}
       <PublicNavbar signedIn={Boolean(user)} />
       <AnnouncementDock announcements={announcements} signedIn={Boolean(user)} />
     </>

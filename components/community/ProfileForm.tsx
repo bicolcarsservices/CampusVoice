@@ -17,7 +17,7 @@ export default function ProfileForm({
   schools,
   avatarUrl,
 }: {
-  profile: { username: string; display_name: string; school_name: string | null; grade_level: string | null; bio: string | null };
+  profile: { username: string; display_name: string; school_name: string | null; grade_level: string | null; gender: string | null; bio: string | null };
   schools: Option[];
   avatarUrl: string | null;
 }) {
@@ -64,6 +64,13 @@ export default function ProfileForm({
       </label>
       <label className="settings-form-field block text-sm font-medium">Username
         <input name="username" required minLength={3} maxLength={20} pattern="[A-Za-z0-9_]+" defaultValue={profile.username} className="input mt-1" />
+      </label>
+      <label className="settings-form-field block text-sm font-medium">Gender <span className="text-slate-500">(private)</span>
+        <select name="gender" required defaultValue={profile.gender ?? ""} className="input mt-1">
+          <option value="" disabled>Select gender</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
       </label>
       <label className="settings-form-field block text-sm font-medium">School <span className="text-slate-500">(optional)</span>
         <input name="school_name" list="profile-schools" maxLength={100} defaultValue={profile.school_name ?? ""} className="input mt-1" placeholder="Type your school or leave blank" />

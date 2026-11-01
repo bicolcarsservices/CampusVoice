@@ -51,6 +51,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   username text not null unique check (username ~ '^[a-zA-Z0-9_]{3,20}$'),
   display_name text not null,
+  gender text check (gender in ('male','female')),
   school_id uuid references public.schools(id) on delete set null,
   grade_level text,
   bio text check (char_length(bio) <= 300),
@@ -61,6 +62,8 @@ create table if not exists public.profiles (
 
 alter table public.profiles add column if not exists school_name text
   check (char_length(school_name) <= 100);
+alter table public.profiles add column if not exists gender text
+  check (gender in ('male','female'));
 
 create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -300,11 +303,12 @@ $$;
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  insert into public.profiles (id, username, display_name, school_id, school_name, grade_level)
+  insert into public.profiles (id, username, display_name, gender, school_id, school_name, grade_level)
   values (
     new.id,
     new.raw_user_meta_data->>'username',
     coalesce(nullif(new.raw_user_meta_data->>'full_name',''), new.raw_user_meta_data->>'username'),
+    nullif(new.raw_user_meta_data->>'gender',''),
     nullif(new.raw_user_meta_data->>'school_id','')::uuid,
     nullif(trim(new.raw_user_meta_data->>'school_name'),''),
     new.raw_user_meta_data->>'grade_level'
@@ -737,7 +741,7 @@ begin
       insert into public.notifications (user_id, type, message, link)
       values (new.user_id, 'subscription_active',
         'Your ' || pname || ' plan is active until ' || to_char(new.expires_at at time zone 'Asia/Manila', 'FMMonth DD, YYYY') || '.',
-        '/subscription');
+        '/subscription/status/' || new.id::text || '?receipt=1');
     elsif new.status = 'expired' then
       insert into public.notifications (user_id, type, message, link)
       values (new.user_id, 'subscription_expired', 'Your ' || pname || ' plan has expired.', '/subscription');
@@ -1007,7 +1011,7 @@ revoke insert, update, delete on public.daily_post_usage from authenticated;
 revoke update on public.subscriptions from authenticated;
 
 revoke update on public.profiles from authenticated;
-grant update (username, display_name, school_id, school_name, grade_level, bio, avatar_path) on public.profiles to authenticated;
+grant update (username, display_name, gender, school_id, school_name, grade_level, bio, avatar_path) on public.profiles to authenticated;
 revoke update on public.notifications from authenticated;
 grant update (is_read) on public.notifications to authenticated;
 

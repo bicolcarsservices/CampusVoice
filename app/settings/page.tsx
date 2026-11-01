@@ -22,7 +22,7 @@ export default async function SettingsPage() {
     { data: posts, error: postsError }, { data: quota, error: quotaError },
     { data: subscription, error: subscriptionError }, { data: photos, error: photosError },
     { data: notificationPreference, error: notificationPreferenceError }] = await Promise.all([
-    supabase.from("profiles").select("id,username,display_name,school_id,school_name,grade_level,bio,avatar_path,created_at,status")
+    supabase.from("profiles").select("id,username,display_name,school_id,school_name,grade_level,gender,bio,avatar_path,created_at,status")
       .eq("id", user.id).maybeSingle(),
     supabase.from("schools").select("id,name").eq("is_active", true).order("name"),
     supabase.from("my_posts").select("id,content,status,is_anonymous,created_at").order("created_at", { ascending: false }).limit(10),
@@ -106,6 +106,7 @@ export default async function SettingsPage() {
             <div className="settings-profile-facts">
               <div><span>School</span><strong>{schoolName}</strong></div>
               <div><span>Grade / year</span><strong>{profile.grade_level || "Not set"}</strong></div>
+              <div><span>Gender (private)</span><strong>{profile.gender ? `${profile.gender[0].toUpperCase()}${profile.gender.slice(1)}` : "Not set"}</strong></div>
               <div><span>Member since</span><strong>{new Date(profile.created_at).toLocaleDateString()}</strong></div>
             </div>
             <ProfileForm
@@ -114,6 +115,7 @@ export default async function SettingsPage() {
                 display_name: profile.display_name,
                 school_name: schoolName === "No school selected" ? "" : schoolName,
                 grade_level: profile.grade_level,
+                gender: profile.gender,
                 bio: profile.bio,
               }}
               schools={schools ?? []}
