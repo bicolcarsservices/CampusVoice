@@ -10,6 +10,7 @@ export default async function Navbar() {
   let user: User | null = null;
   let isAdmin = false;
   let announcements: PublicAnnouncement[] = [];
+  let paymentStatusError = false;
   let latestPaymentRequest: {
     id: string;
     status: string;
@@ -47,8 +48,10 @@ export default async function Navbar() {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (paymentRequestError) throw new Error(`Could not load payment status: ${paymentRequestError.message}`);
-      if (paymentRequest) {
+      if (paymentRequestError) {
+        console.error("Could not load payment status for navigation.", paymentRequestError);
+        paymentStatusError = true;
+      } else if (paymentRequest) {
         const plan = Array.isArray(paymentRequest.subscription_plans)
           ? paymentRequest.subscription_plans[0]
           : paymentRequest.subscription_plans;
@@ -69,6 +72,14 @@ export default async function Navbar() {
       {user && <PresenceHeartbeat />}
       {user && !isAdmin && <SubscriptionApprovalToast />}
       {user && <SubscriptionPaymentStatus initialRequest={latestPaymentRequest} />}
+      {user && paymentStatusError && (
+        <p
+          role="status"
+          className="fixed bottom-24 right-4 z-[60] max-w-sm rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 shadow-lg dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+        >
+          Payment status is temporarily unavailable. Please try again later.
+        </p>
+      )}
       <PublicNavbar signedIn={Boolean(user)} />
       <AnnouncementDock announcements={announcements} signedIn={Boolean(user)} />
     </>
